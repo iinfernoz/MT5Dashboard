@@ -10,7 +10,7 @@
 
 //--- Input Parameters สำหรับให้ผู้ใช้ตั้งค่าตอนลาก EA ใส่กราฟ
 input group "Dashboard Settings"
-input string InpApiEndpoint = "http://192.168.1.53:7001/api/update"; // << สำคัญ: แก้ไขเป็น URL ของ API ของคุณ
+input string InpApiEndpoint = "https://mt5api.batnass.synology.me/api/update"; // << สำคัญ: แก้ไขเป็น URL ของ API ของคุณ
 input string InpAccountName = "My Main Account"; // ชื่อบัญชีสำหรับแสดงบน Dashboard
 input ulong  InpMagicNumber = 0; // Magic Number ของ EA (ถ้าไม่ใช้ใส่ 0)
 input int    InpUpdateIntervalSeconds = 60; // อัปเดตข้อมูลทุกๆกี่วินาที (แนะนำ 60-300)
