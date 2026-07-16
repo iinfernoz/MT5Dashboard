@@ -307,25 +307,44 @@ def get_equity_history():
         return jsonify({"status": "error", "message": "Could not connect to the database"}), 503
 
     try:
-        # This query sums the equity of all accounts for each timestamp.
-        # It groups data into 5-minute intervals to reduce the number of data points.
+        # This query builds the total equity curve using the latest account snapshot
+        # inside each 5-minute interval. It avoids double-counting multiple updates
+        # from the same account within the same bucket.
         sql = """
             SELECT
-                -- Group timestamps into 5-minute intervals
-                FROM_UNIXTIME(FLOOR(UNIX_TIMESTAMP(received_at) / 300) * 300) AS time_interval,
+                time_interval,
                 SUM(equity) AS total_equity
-            FROM
-                account_data
-            WHERE
-                received_at >= NOW() - INTERVAL 7 DAY -- Limit to last 7 days for performance
-            GROUP BY
-                time_interval
-            ORDER BY
-                time_interval;
+            FROM (
+                SELECT
+                    FROM_UNIXTIME(FLOOR(UNIX_TIMESTAMP(a.received_at) / 300) * 300) AS time_interval,
+                    a.account_number,
+                    a.equity
+                FROM account_data a
+                JOIN (
+                    SELECT
+                        account_number,
+                        FLOOR(UNIX_TIMESTAMP(received_at) / 300) AS interval_bucket,
+                        MAX(received_at) AS max_received_at
+                    FROM account_data
+                    WHERE received_at >= NOW() - INTERVAL 7 DAY
+                    GROUP BY account_number, interval_bucket
+                ) b ON a.account_number = b.account_number
+                    AND FLOOR(UNIX_TIMESTAMP(a.received_at) / 300) = b.interval_bucket
+                    AND a.received_at = b.max_received_at
+                WHERE a.received_at >= NOW() - INTERVAL 7 DAY
+            ) t
+            GROUP BY time_interval
+            ORDER BY time_interval;
         """
         with conn.cursor() as cursor:
             cursor.execute(sql)
             history = cursor.fetchall()
+
+        # Convert stored cent values to USD for the chart.
+        for row in history:
+            total_equity = row.get('total_equity')
+            row['total_equity'] = float(total_equity) / 100.0 if total_equity is not None else 0.0
+
         return jsonify(history), 200
     except Exception as e:
         print(f"Equity History Error: {e}")

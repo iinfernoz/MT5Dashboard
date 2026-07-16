@@ -14,6 +14,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const monthlyProfitEl = document.getElementById('monthly-profit');
 
     const accountsTableContainer = document.getElementById('accounts-table-container');
+    const equityChartCanvas = document.getElementById('equity-chart');
+    let equityChart = null;
+    const EQUITY_HISTORY_URL = '/api/equity_history';
 
     // Modal elements
     const modal = document.getElementById('details-modal');
@@ -35,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateStatus(state, message) {
-        statusIndicator.className = state;
+        statusIndicator.className = `status-dot ${state}`;
         statusText.textContent = message;
     }
 
@@ -50,6 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             currentAccountsData = data.accounts; // Save the latest account data
             updateDashboard(data);
+            await fetchEquityHistory();
             updateStatus('connected', `Last updated: ${new Date().toLocaleTimeString()}`);
 
         } catch (error) {
@@ -73,6 +77,116 @@ document.addEventListener('DOMContentLoaded', () => {
         renderTable(data.accounts);
     }
 
+    async function fetchEquityHistory() {
+        try {
+            const response = await fetch(EQUITY_HISTORY_URL);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const history = await response.json();
+            renderEquityChart(history);
+        } catch (error) {
+            console.error('Failed to fetch equity history:', error);
+            if (equityChart) {
+                equityChart.data.labels = [];
+                equityChart.data.datasets[0].data = [];
+                equityChart.update();
+            }
+        }
+    }
+
+    function renderEquityChart(history) {
+        if (!Array.isArray(history) || history.length === 0) {
+            console.warn('Equity history is empty or invalid');
+            if (equityChart) {
+                equityChart.data.datasets[0].data = [];
+                equityChart.update();
+            }
+            return;
+        }
+
+        const dataPoints = history.map(point => {
+            const timeValue = new Date(point.time_interval).getTime();
+            return {
+                x: Number.isFinite(timeValue) ? timeValue : null,
+                y: Number(point.total_equity) || 0
+            };
+        }).filter(point => point.x !== null);
+
+        if (dataPoints.length === 0) {
+            console.warn('Equity history points could not be parsed');
+            if (equityChart) {
+                equityChart.data.datasets[0].data = [];
+                equityChart.update();
+            }
+            return;
+        }
+
+        if (!equityChart) {
+            equityChart = new Chart(equityChartCanvas, {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        label: 'Total Equity',
+                        data: dataPoints,
+                        borderColor: 'rgba(56, 189, 248, 0.92)',
+                        backgroundColor: 'rgba(56, 189, 248, 0.18)',
+                        fill: true,
+                        tension: 0.24,
+                        pointRadius: 0,
+                        borderWidth: 2,
+                        hoverRadius: 4,
+                        hoverBorderWidth: 2,
+                        spanGaps: true,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: context => `Equity: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(context.parsed.y)}`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'day',
+                                tooltipFormat: 'PP',
+                            },
+                            grid: {
+                                color: 'rgba(148, 163, 184, 0.18)'
+                            },
+                            ticks: {
+                                color: 'rgba(226, 232, 240, 0.8)'
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(148, 163, 184, 0.18)'
+                            },
+                            ticks: {
+                                color: 'rgba(226, 232, 240, 0.8)',
+                                callback: value => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value)
+                            }
+                        }
+                    }
+                }
+            });
+        } else {
+            equityChart.data.datasets[0].data = dataPoints;
+            equityChart.update();
+        }
+    }
+
     function renderTable(accounts) {
         if (accounts.length === 0) {
             accountsTableContainer.innerHTML = '<p style="text-align:center; padding: 20px;">No account data received yet.</p>';
@@ -85,7 +199,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     <tr>
                         <th>Status</th>
                         <th>Account</th>
-                        <th>Broker</th>
                         <th>Balance</th>
                         <th>Equity</th>
                         <th>Floating P/L</th>
@@ -116,7 +229,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             <span class="account-number">#${acc.account_number || 'N/A'}</span>
                         </div>
                     </td>
-                    <td data-label="Broker"><span class="broker-name">${acc.broker_name || 'N/A'}</span></td>
                     <td data-label="Balance"><span class="currency-cell">${formatCurrency(acc.balance)}</span></td>
                     <td data-label="Equity"><span class="currency-cell">${formatCurrency(acc.equity)}</span></td>
                     <td data-label="Floating P/L"><span class="profit-pill ${floatingPlClass}">${formatCurrency(acc.floating_pl || 0)}</span></td>

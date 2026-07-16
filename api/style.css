@@ -59,34 +59,46 @@ body {
     gap: 10px;
     padding: 12px 18px;
     border-radius: 999px;
-    background: rgba(15, 23, 42, 0.82);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(15, 23, 42, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     color: var(--muted);
     font-size: 0.95rem;
 }
 
 .status-dot {
-    width: 10px;
-    height: 10px;
+    display: inline-block;
+    width: 12px;
+    height: 12px;
     border-radius: 50%;
     background: #64748b;
     box-shadow: 0 0 0 4px rgba(100, 116, 139, 0.12);
     transition: background-color 0.25s ease, box-shadow 0.25s ease;
+    margin-right: 8px;
+    vertical-align: middle;
 }
 
-.status-dot.connected {
+.status-label {
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.status-dot.connected,
+.status-dot.status-online,
+.status-online {
     background: var(--success);
-    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.18);
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.25);
 }
 
-.status-dot.disconnected {
+.status-dot.disconnected,
+.status-dot.status-offline,
+.status-offline {
     background: #f97316;
-    box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.18);
+    box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.25);
 }
 
 .status-dot.error {
     background: var(--danger);
-    box-shadow: 0 0 0 4px rgba(244, 62, 94, 0.18);
+    box-shadow: 0 0 0 4px rgba(244, 62, 94, 0.25);
 }
 
 .dashboard-grid {
@@ -225,14 +237,24 @@ body {
     background-color: rgba(255, 255, 255, 0.08);
 }
 
-.profit-pill.positive {
+.profit-pill.profit-positive {
     color: var(--success);
     background-color: rgba(16, 185, 129, 0.14);
 }
 
-.profit-pill.negative {
+.profit-positive {
+    color: var(--success);
+    background: none;
+}
+
+.profit-pill.profit-negative {
     color: var(--danger);
     background-color: rgba(244, 62, 94, 0.14);
+}
+
+.profit-negative {
+    color: var(--danger);
+    background: none;
 }
 
 .account-name {
@@ -348,13 +370,18 @@ body {
     color: var(--text);
 }
 
+.trades-table td.profit-positive {
+    color: var(--success);
+}
+
+.trades-table td.profit-negative {
+    color: var(--danger);
+}
+
 .trades-table th {
     color: var(--muted);
     font-weight: 700;
     text-align: left;
-}
-
-    text-align: right;
 }
 
 .trades-table th:first-child, .trades-table td:first-child,
@@ -363,8 +390,15 @@ body {
     text-align: left;
 }
 
-.trade-buy { color: #2e7d32; font-weight: bold; }
-.trade-sell { color: #c62828; font-weight: bold; }
+.trades-table td.trade-buy {
+    color: #10b981;
+    font-weight: 700;
+}
+
+.trades-table td.trade-sell {
+    color: #f43f5e;
+    font-weight: 700;
+}
 
 /* --- Mobile Responsive Styles --- */
 @media screen and (max-width: 768px) {
@@ -395,6 +429,8 @@ body {
 
     .accounts-table-container {
         border-radius: 6px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
     .modal-content {
@@ -406,77 +442,12 @@ body {
         font-size: 1.4em;
     }
 
-    .accounts-table-container table,
-    .accounts-table-container thead,
-    .accounts-table-container tbody,
+    .accounts-table-container table {
+        min-width: 720px;
+    }
+
     .accounts-table-container th,
-    .accounts-table-container td,
-    .accounts-table-container tr {
-        display: block;
-    }
-
-    .accounts-table-container thead tr {
-        position: absolute;
-        top: -9999px;
-        left: -9999px;
-    }
-
-    .accounts-table-container tr {
-        border: 1px solid #4a5568;
-        border-radius: 5px;
-        margin-bottom: 12px;
-        padding: 12px 0;
-    }
-
     .accounts-table-container td {
-        border: none;
-        border-bottom: 1px solid #4a5568;
-        position: relative;
-        padding-left: 50%;
-    }
-
-    .accounts-table-container td:before {
-        position: absolute;
-        top: 12px;
-        left: 10px;
-        width: 45%;
-        padding-right: 10px;
         white-space: nowrap;
-        content: attr(data-label);
-        font-weight: bold;
-        color: #cbd5e0;
-    }
-
-    .accounts-table-container td:last-child {
-        border-bottom: none;
-    }
-}
-    .accounts-table-container tr {
-        border: 1px solid #4a5568;
-        border-radius: 5px;
-        margin-bottom: 10px;
-    }
-
-    .accounts-table-container td {
-        border: none;
-        border-bottom: 1px solid #4a5568;
-        position: relative;
-        padding-left: 50%;
-    }
-
-    .accounts-table-container td:before {
-        position: absolute;
-        top: 12px;
-        left: 10px;
-        width: 45%;
-        padding-right: 10px;
-        white-space: nowrap;
-        content: attr(data-label);
-        font-weight: bold;
-        color: #a0aec0;
-    }
-
-    .accounts-table-container td:last-child {
-        border-bottom: none;
     }
 }
