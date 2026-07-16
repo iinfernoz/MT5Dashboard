@@ -6,56 +6,63 @@
     <title>EA Dashboard</title>
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
-    <div class="container">
-        <header>
-            <h1>EA Dashboard</h1>
-            <div class="status">
-                <span id="status-indicator" class="disconnected"></span>
+<body class="page-shell">
+    <div class="page-container">
+        <header class="page-header">
+            <div>
+                <h1>EA Dashboard</h1>
+                <p class="subtitle">ภาพรวมระบบเทรดอัตโนมัติ</p>
+            </div>
+            <div id="status-container" class="status-pill">
+                <span id="status-indicator" class="status-dot disconnected"></span>
                 <span id="status-text">Connecting...</span>
             </div>
         </header>
 
-        <main>
-            <section class="summary-cards">
-                <div class="card">
+        <main class="dashboard-grid">
+            <section class="dashboard-row">
+                <div class="glass-card">
                     <h3>Total Balance</h3>
-                    <p id="total-balance">$0.00</p>
+                    <p id="total-balance" class="value">$0.00</p>
                 </div>
-                <div class="card">
+                <div class="glass-card">
                     <h3>Total Equity</h3>
-                    <p id="total-equity">$0.00</p>
+                    <p id="total-equity" class="value accent">$0.00</p>
                 </div>
-                <div class="card">
+                <div class="glass-card">
                     <h3>Floating P/L</h3>
-                    <p id="total-floating-pl">$0.00</p>
+                    <p id="total-floating-pl" class="value negative">$0.00</p>
                 </div>
-                <div class="card">
+                <div class="glass-card">
                     <h3>Accounts</h3>
-                    <p id="account-count">0</p>
+                    <p id="account-count" class="value">0</p>
                 </div>
             </section>
 
-            <section class="summary-cards">
-                <div class="card profit-card">
+            <section class="dashboard-row profit-highlights">
+                <div class="glass-card profit-card">
                     <h3>Daily Profit</h3>
-                    <p id="daily-profit">$0.00</p>
+                    <p id="daily-profit" class="value positive">$0.00</p>
                 </div>
-                <div class="card profit-card">
+                <div class="glass-card profit-card">
                     <h3>Weekly Profit</h3>
-                    <p id="weekly-profit">$0.00</p>
+                    <p id="weekly-profit" class="value positive">$0.00</p>
                 </div>
-                <div class="card profit-card">
+                <div class="glass-card profit-card">
                     <h3>Monthly Profit</h3>
-                    <p id="monthly-profit">$0.00</p>
+                    <p id="monthly-profit" class="value positive">$0.00</p>
                 </div>
             </section>
 
-            <section id="accounts-table-container" class="accounts-table-container"></section>
+            <section id="accounts-table-container" class="glass-card table-card"></section>
 
-            <section class="chart-container">
-                <h3>Total Equity Curve (Last 7 Days)</h3>
-                <canvas id="equity-chart"></canvas>
+            <section class="glass-card chart-card">
+                <div class="card-header">
+                    <h2>Total Equity Curve (Last 7 Days)</h2>
+                </div>
+                <div class="chart-wrapper">
+                    <canvas id="equity-chart"></canvas>
+                </div>
             </section>
         </main>
     </div>
