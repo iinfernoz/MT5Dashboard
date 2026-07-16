@@ -211,8 +211,7 @@ def get_dashboard_data():
                         if isinstance(t, dict):
                             if 'profit' in t and t['profit'] is not None:
                                 t['profit'] = cents_to_usd(t['profit'])
-                            if 'open_price' in t and t['open_price'] is not None:
-                                t['open_price'] = cents_to_usd(t['open_price'])
+                            # NOTE: 'open_price' is already in USD (price), do not convert from cents.
             if not accounts:
                 return jsonify({
                     "summary": {
@@ -251,15 +250,23 @@ def get_dashboard_data():
                 SELECT SUM(final_daily_profit) as period_profit FROM DailyFinalProfits;
             """
 
-            # Calculate total weekly profit
+            # Calculate total weekly profit (DB stores cents — convert to USD)
             cursor.execute(sql_periodic, (start_of_week,))
             weekly_result = cursor.fetchone()
-            total_weekly_profit = weekly_result['period_profit'] if weekly_result and weekly_result['period_profit'] is not None else 0
+            try:
+                weekly_cents = weekly_result['period_profit'] if weekly_result and weekly_result['period_profit'] is not None else 0
+                total_weekly_profit = float(weekly_cents) / 100.0
+            except Exception:
+                total_weekly_profit = 0
 
-            # Calculate total monthly profit
+            # Calculate total monthly profit (DB stores cents — convert to USD)
             cursor.execute(sql_periodic, (start_of_month,))
             monthly_result = cursor.fetchone()
-            total_monthly_profit = monthly_result['period_profit'] if monthly_result and monthly_result['period_profit'] is not None else 0
+            try:
+                monthly_cents = monthly_result['period_profit'] if monthly_result and monthly_result['period_profit'] is not None else 0
+                total_monthly_profit = float(monthly_cents) / 100.0
+            except Exception:
+                total_monthly_profit = 0
 
             response_data = {
                 "summary": {
