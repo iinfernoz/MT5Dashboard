@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EA Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>EA Dashboard</h1>
+            <div class="status">
+                <span id="status-indicator" class="disconnected"></span>
+                <span id="status-text">Connecting...</span>
+            </div>
+        </header>
+
+        <main>
+            <section class="summary-cards">
+                <div class="card">
+                    <h3>Total Balance</h3>
+                    <p id="total-balance">$0.00</p>
+                </div>
+                <div class="card">
+                    <h3>Total Equity</h3>
+                    <p id="total-equity">$0.00</p>
+                </div>
+                <div class="card">
+                    <h3>Floating P/L</h3>
+                    <p id="total-floating-pl">$0.00</p>
+                </div>
+                <div class="card">
+                    <h3>Accounts</h3>
+                    <p id="account-count">0</p>
+                </div>
+            </section>
+
+            <section class="summary-cards">
+                <div class="card profit-card">
+                    <h3>Daily Profit</h3>
+                    <p id="daily-profit">$0.00</p>
+                </div>
+                <div class="card profit-card">
+                    <h3>Weekly Profit</h3>
+                    <p id="weekly-profit">$0.00</p>
+                </div>
+                <div class="card profit-card">
+                    <h3>Monthly Profit</h3>
+                    <p id="monthly-profit">$0.00</p>
+                </div>
+            </section>
+
+            <section id="accounts-table-container" class="accounts-table-container"></section>
+
+            <section class="chart-container">
+                <h3>Total Equity Curve (Last 7 Days)</h3>
+                <canvas id="equity-chart"></canvas>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal Structure (Hidden by default) -->
+    <div id="details-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2 id="modal-account-name">Account Details</h2>
+            <div id="modal-body">
+                <!-- Details will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

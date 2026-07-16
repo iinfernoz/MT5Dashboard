@@ -1,0 +1,63 @@
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+
+# Docker
+# This directory contains the live database data and should NEVER be committed.
+db_data/
+
+# IDE / Editor specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.*
+.env.local
+
+# Logs / runtime files
+*.log
+*.pid
+*.tmp
+*.bak
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+
+# Docker
+# This directory contains the live database data and should NEVER be committed.
+db_data/
+
+# IDE / Editor specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+db_data/aria_log_control
+db_data/aria_log_control
+db_data/aria_log_control
+db_data/ddl_recovery.log
+db_data/ea_dashboard/account_data.ibd

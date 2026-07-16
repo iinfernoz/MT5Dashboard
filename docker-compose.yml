@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  db:
+    image: mariadb:10.8
+    container_name: ea_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: your_strong_password
+      MYSQL_DATABASE: ea_dashboard
+    volumes:
+      - ./db_data:/var/lib/mysql
+    networks:
+      - ea_network
+
+  api:
+    build: ./api
+    container_name: ea_api
+    restart: unless-stopped
+    depends_on:
+      - db
+    ports:
+      - "7001:5001"
+    environment:
+      DB_HOST: db
+      DB_USER: root
+      DB_PASSWORD: your_strong_password
+      DB_NAME: ea_dashboard
+    networks:
+      - ea_network
+  
+  frontend:
+    image: nginx:alpine
+    container_name: ea_frontend
+    restart: unless-stopped
+    ports:
+      - "7000:80" # Access the dashboard via http://localhost:7000
+    volumes:
+      - ./api:/usr/share/nginx/html # Mount frontend files from the 'api' folder
+      - ./api/nginx.conf:/etc/nginx/conf.d/default.conf # Mount nginx config from the 'api' folder
+    depends_on:
+      - api
+    networks:
+      - ea_network
+
+volumes:
+  db_data:
+
+networks:
+  ea_network:
+    driver: bridge
