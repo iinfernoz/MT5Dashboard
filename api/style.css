@@ -89,15 +89,18 @@ table {
 }
 
 th, td {
-    padding: 15px;
+    padding: 12px 14px;
     text-align: left;
     border-bottom: 1px solid #4a5568; /* Darker border */
 }
 
 th {
-    background-color: #1a202c;
+    background-color: #111827;
     font-weight: 700;
-    color: #a0aec0;
+    color: #cbd5e0;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    font-size: 0.85em;
 }
 
 tbody tr:last-child td {
@@ -105,20 +108,21 @@ tbody tr:last-child td {
 }
 
 tbody tr:hover {
-    background-color: #4a5568;
+    background-color: #374151;
 }
 
 .profit-positive {
-    color: #2e7d32;
+    color: #22c55e;
 }
 
 .profit-negative {
-    color: #c62828;
+    color: #f87171;
 }
 
 .time-cell {
     font-size: 0.9em;
-    color: #a0aec0;
+    color: #94a3b8;
+    white-space: nowrap;
 }
 
 .status-dot {
@@ -127,6 +131,57 @@ tbody tr:hover {
     height: 10px;
     border-radius: 50%;
     margin-right: 8px;
+}
+
+.status-label {
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.account-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.account-name {
+    font-weight: 700;
+    color: #f8fafc;
+}
+
+.account-number {
+    font-size: 0.87em;
+    color: #94a3b8;
+}
+
+.broker-name {
+    display: inline-block;
+    color: #e2e8f0;
+    font-size: 0.95em;
+}
+
+.currency-cell {
+    display: inline-block;
+    min-width: 120px;
+}
+
+.profit-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 0.9em;
+    font-weight: 700;
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.profit-pill.profit-positive {
+    background-color: rgba(34, 197, 94, 0.16);
+}
+
+.profit-pill.profit-negative {
+    background-color: rgba(248, 113, 113, 0.16);
 }
 
 .status-online {
@@ -221,17 +276,29 @@ tbody tr:hover {
         padding: 10px; /* Reduce padding on smaller screens */
     }
 
+    .summary-cards {
+        gap: 14px;
+    }
+
+    .card {
+        padding: 16px;
+    }
+
     .card p {
-        font-size: 1.5em; /* Slightly smaller text in cards */
+        font-size: 1.4em; /* Slightly smaller text in cards */
     }
 
     .profit-card p {
-        font-size: 1.3em;
+        font-size: 1.2em;
     }
 
     th, td {
-        padding: 12px 8px; /* Reduce padding in table cells */
-        font-size: 0.9em;
+        padding: 10px 8px; /* Reduce padding in table cells */
+        font-size: 0.85em;
+    }
+
+    .accounts-table-container {
+        border-radius: 6px;
     }
 
     .modal-content {
@@ -240,15 +307,14 @@ tbody tr:hover {
     }
 
     header h1 {
-        font-size: 1.5em;
+        font-size: 1.4em;
     }
 
-    /* Transform table for mobile view */
-    .accounts-table-container table, 
-    .accounts-table-container thead, 
-    .accounts-table-container tbody, 
-    .accounts-table-container th, 
-    .accounts-table-container td, 
+    .accounts-table-container table,
+    .accounts-table-container thead,
+    .accounts-table-container tbody,
+    .accounts-table-container th,
+    .accounts-table-container td,
     .accounts-table-container tr {
         display: block;
     }
@@ -259,6 +325,36 @@ tbody tr:hover {
         left: -9999px;
     }
 
+    .accounts-table-container tr {
+        border: 1px solid #4a5568;
+        border-radius: 5px;
+        margin-bottom: 12px;
+        padding: 12px 0;
+    }
+
+    .accounts-table-container td {
+        border: none;
+        border-bottom: 1px solid #4a5568;
+        position: relative;
+        padding-left: 50%;
+    }
+
+    .accounts-table-container td:before {
+        position: absolute;
+        top: 12px;
+        left: 10px;
+        width: 45%;
+        padding-right: 10px;
+        white-space: nowrap;
+        content: attr(data-label);
+        font-weight: bold;
+        color: #cbd5e0;
+    }
+
+    .accounts-table-container td:last-child {
+        border-bottom: none;
+    }
+}
     .accounts-table-container tr {
         border: 1px solid #4a5568;
         border-radius: 5px;

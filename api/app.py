@@ -1,6 +1,7 @@
 import os
 import pymysql
 import json
+from datetime import datetime
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
@@ -98,7 +99,7 @@ def update_ea_data():
     data = request.get_json()
 
     # Add 'open_trades' to the list of required fields
-    required_fields = ['account_number', 'account_name', 'broker_name', 'magic_number', 'balance', 'equity', 'profit', 'floating_pl', 'open_trades', 'server_time']
+    required_fields = ['account_number', 'account_name', 'broker_name', 'magic_number', 'balance', 'equity', 'profit', 'floating_pl', 'open_trades']
     missing_fields = [field for field in required_fields if field not in data]
     if missing_fields:
         return jsonify({"status": "error", "message": f"Missing required fields: {missing_fields}"}), 400
@@ -126,7 +127,7 @@ def update_ea_data():
                 data.get('profit'),
                 data.get('floating_pl'),
                 json.dumps(data.get('open_trades')), # A more direct way to get a JSON string
-                data.get('server_time'),
+                datetime.utcnow(),
             ))
         conn.commit()
         return jsonify({"status": "success", "message": "Data saved"}), 201
@@ -188,6 +189,30 @@ def get_dashboard_data():
                 elif not trades_str:
                     acc['open_trades'] = [] # If it's None/NULL, default to empty list
 
+            # --- Convert amounts from cents to USD for display ---
+            def cents_to_usd(v):
+                try:
+                    if v is None:
+                        return 0.0
+                    return float(v) / 100.0
+                except Exception:
+                    return 0.0
+
+            for acc in accounts:
+                # Convert top-level numeric fields
+                acc['balance'] = cents_to_usd(acc.get('balance'))
+                acc['equity'] = cents_to_usd(acc.get('equity'))
+                acc['profit'] = cents_to_usd(acc.get('profit'))
+                acc['floating_pl'] = cents_to_usd(acc.get('floating_pl', 0))
+
+                # Convert values inside open_trades if present
+                if isinstance(acc.get('open_trades'), list):
+                    for t in acc['open_trades']:
+                        if isinstance(t, dict):
+                            if 'profit' in t and t['profit'] is not None:
+                                t['profit'] = cents_to_usd(t['profit'])
+                            if 'open_price' in t and t['open_price'] is not None:
+                                t['open_price'] = cents_to_usd(t['open_price'])
             if not accounts:
                 return jsonify({
                     "summary": {
@@ -198,10 +223,10 @@ def get_dashboard_data():
                     "accounts": []
                 }), 200
 
-            # --- Calculate Summary Stats ---
-            total_balance = sum(acc['balance'] or 0 for acc in accounts)
-            total_equity = sum(acc['equity'] or 0 for acc in accounts)
-            total_daily_profit = sum(acc['profit'] or 0 for acc in accounts)
+            # --- Calculate Summary Stats (values are already in USD) ---
+            total_balance = sum(acc.get('balance', 0) or 0 for acc in accounts)
+            total_equity = sum(acc.get('equity', 0) or 0 for acc in accounts)
+            total_daily_profit = sum(acc.get('profit', 0) or 0 for acc in accounts)
             total_floating_pl = sum(acc.get('floating_pl', 0) or 0 for acc in accounts)
 
             # --- Calculate Weekly & Monthly Profit ---

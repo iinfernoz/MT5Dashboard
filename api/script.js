@@ -84,14 +84,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 <thead>
                     <tr>
                         <th>Status</th>
-                        <th>AccountNumber</th>
-                        <th>Account Name</th>
-                        <th>Broker Name</th>
+                        <th>Account</th>
+                        <th>Broker</th>
                         <th>Balance</th>
                         <th>Equity</th>
                         <th>Floating P/L</th>
                         <th>Daily Profit</th>
-                        <th>Last Update (Server)</th>
+                        <th>Last Update</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -102,22 +101,27 @@ document.addEventListener('DOMContentLoaded', () => {
             const floatingPlClass = (acc.floating_pl || 0) >= 0 ? 'profit-positive' : 'profit-negative';
 
             const lastUpdate = new Date(acc.last_update);
+            const lastUpdateThai = isNaN(lastUpdate) ? 'N/A' : lastUpdate.toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', hour12: false });
             const now = new Date();
-            const minutesDiff = (now - lastUpdate) / 1000 / 60;
+            const minutesDiff = isNaN(lastUpdate) ? Infinity : (now - lastUpdate) / 1000 / 60;
             const statusClass = minutesDiff > 5 ? 'status-offline' : 'status-online';
             const statusText = minutesDiff > 5 ? 'Offline' : 'Online';
 
             tableHTML += `
                 <tr class="clickable-row" data-account-number="${acc.account_number}">
-                    <td data-label="Status"><span class="status-dot ${statusClass}"></span>${statusText}</td>
-                    <td data-label="Account Number">${acc.account_number || 'N/A'}</td>
-                    <td data-label="Account Name">${acc.account_name || 'N/A'}</td>
-                    <td data-label="Broker Name">${acc.broker_name || 'N/A'}</td>
-                    <td data-label="Balance">${formatCurrency(acc.balance)}</td>
-                    <td data-label="Equity">${formatCurrency(acc.equity)}</td>
-                    <td data-label="Floating P/L" class="${floatingPlClass}">${formatCurrency(acc.floating_pl || 0)}</td>
-                    <td data-label="Daily Profit" class="${dailyProfitClass}">${formatProfit(acc.profit || 0)}</td>
-                    <td data-label="Last Update" class="time-cell">${new Date(acc.last_update).toLocaleString()}</td>
+                    <td data-label="Status"><span class="status-dot ${statusClass}"></span><span class="status-label">${statusText}</span></td>
+                    <td data-label="Account">
+                        <div class="account-cell">
+                            <span class="account-name">${acc.account_name || 'N/A'}</span>
+                            <span class="account-number">#${acc.account_number || 'N/A'}</span>
+                        </div>
+                    </td>
+                    <td data-label="Broker"><span class="broker-name">${acc.broker_name || 'N/A'}</span></td>
+                    <td data-label="Balance"><span class="currency-cell">${formatCurrency(acc.balance)}</span></td>
+                    <td data-label="Equity"><span class="currency-cell">${formatCurrency(acc.equity)}</span></td>
+                    <td data-label="Floating P/L"><span class="profit-pill ${floatingPlClass}">${formatCurrency(acc.floating_pl || 0)}</span></td>
+                    <td data-label="Daily Profit"><span class="profit-pill ${dailyProfitClass}">${formatProfit(acc.profit || 0)}</span></td>
+                    <td data-label="Last Update" class="time-cell">${lastUpdateThai}</td>
                 </tr>
             `;
         });
