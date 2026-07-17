@@ -14,9 +14,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const monthlyProfitEl = document.getElementById('monthly-profit');
 
     const accountsTableContainer = document.getElementById('accounts-table-container');
+    const economicEventsContainer = document.getElementById('economic-events-container');
+    const eventsListEl = document.getElementById('events-list');
+    const eventsMetaEl = document.getElementById('economic-events-meta');
     const equityChartCanvas = document.getElementById('equity-chart');
     let equityChart = null;
     const EQUITY_HISTORY_URL = '/api/equity_history';
+    const ECON_EVENTS_URL = '/api/economic-events';
 
     // Modal elements
     const modal = document.getElementById('details-modal');
@@ -24,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalBodyEl = document.getElementById('modal-body');
     const closeButton = document.querySelector('.close-button');
     let currentAccountsData = []; // Store current data to use for the modal
+    let selectedEventDate = null;
 
     function formatCurrency(value) {
         return new Intl.NumberFormat('en-US', {
@@ -54,12 +59,137 @@ document.addEventListener('DOMContentLoaded', () => {
             currentAccountsData = data.accounts; // Save the latest account data
             updateDashboard(data);
             await fetchEquityHistory();
+            await fetchEconomicEvents();
             updateStatus('connected', `Last updated: ${new Date().toLocaleTimeString()}`);
 
         } catch (error) {
             console.error("Failed to fetch data:", error);
             updateStatus('error', 'Failed to load data');
         }
+    }
+
+    async function fetchEconomicEvents() {
+        if (!eventsListEl) return;
+        try {
+            const resp = await fetch(ECON_EVENTS_URL);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const body = await resp.json();
+            renderEconomicEvents(body);
+        } catch (err) {
+            console.error('Failed to fetch economic events:', err);
+            if (eventsListEl) eventsListEl.innerHTML = '<p style="padding:12px;">Unable to load events.</p>';
+        }
+    }
+
+    function renderEconomicEvents(payload) {
+        if (!eventsListEl) return;
+        // Do not display source/fetched meta per UX request
+
+        const dates = Array.isArray(payload.dates) ? payload.dates : [];
+        const byDate = payload.events_by_date || {};
+
+        if (!dates || dates.length === 0) {
+            eventsListEl.innerHTML = '<p class="text-gray-300">ยังไม่มีข่าวสำคัญในสัปดาห์นี้</p>';
+            return;
+        }
+
+        const todayIso = new Date().toISOString().slice(0, 10);
+
+        // Determine active date: keep previously selected if still available, otherwise prefer today, else first date
+        let activeDate = todayIso;
+        if (selectedEventDate && Array.isArray(dates) && dates.includes(selectedEventDate)) {
+            activeDate = selectedEventDate;
+        } else if (Array.isArray(dates) && dates.includes(todayIso)) {
+            activeDate = todayIso;
+        } else if (Array.isArray(dates) && dates.length) {
+            activeDate = dates[0];
+        }
+
+        // Tabs
+        let tabsHtml = '<div class="flex space-x-2 overflow-x-auto pb-4 mb-4 border-b border-gray-800" id="dayTabs">';
+        dates.forEach(d => {
+            const isActive = d === activeDate;
+            const label = (d === todayIso) ? 'วันนี้' : new Date(d).toLocaleDateString('th-TH', { day: '2-digit', month: 'short' });
+            const btnClasses = isActive ? 'px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium whitespace-nowrap transition-all' : 'px-4 py-2 bg-gray-800 text-gray-300 rounded-lg font-medium hover:bg-gray-700 whitespace-nowrap transition-all';
+            tabsHtml += `<button class="day-tab ${btnClasses}" data-date="${d}">${label}</button>`;
+        });
+        tabsHtml += '</div>';
+
+        // Content sections
+        let contentHtml = '<div id="newsContainer">';
+        dates.forEach(d => {
+            const list = Array.isArray(byDate[d]) ? byDate[d] : [];
+            const dateLabel = new Date(d).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+            let inner = '';
+            if (list.length === 0) {
+                inner = '<p class="text-gray-400">ไม่มีข่าว</p>';
+            } else {
+                inner = '<div class="space-y-3">' + list.map(ev => {
+                    const title = ev.title || ev.event || ev.name || ev.description || 'Untitled';
+                    // Normalize and convert time to Thailand timezone, display only HH:MM (24h)
+                    let parsedTime = null;
+                    const timeCandidates = [ev.date, ev.datetime, ev.time, ev.local_date];
+                    for (const t of timeCandidates) {
+                        if (!t) continue;
+                        const d = new Date(t);
+                        if (!isNaN(d.getTime())) { parsedTime = d; break; }
+                    }
+                    if (!parsedTime && ev.timestamp) {
+                        const ts = Number(ev.timestamp);
+                        if (!isNaN(ts)) parsedTime = new Date(ts * 1000);
+                    }
+                    let time = '';
+                    if (parsedTime) {
+                        time = new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Bangkok' }).format(parsedTime);
+                    }
+                    const country = ev.country || ev.currency || ev.country_iso || '';
+                    const impact = (ev.impact || ev.importance || 'High').toString().toUpperCase();
+                    return `
+                        <div class="flex items-center justify-between p-4 bg-gray-900 rounded-xl border border-gray-800">
+                            <div>
+                                <h3 class="font-bold text-white">${title}</h3>
+                                <p class="text-sm text-gray-400">${country} · ${time}</p>
+                            </div>
+                            <span class="px-3 py-1 bg-red-900/30 text-red-400 text-xs font-bold rounded-full border border-red-900/50">${impact}</span>
+                        </div>
+                    `;
+                }).join('') + '</div>';
+            }
+            const hiddenAttr = (d === activeDate) ? '' : ' hidden';
+            contentHtml += `<section id="day-${d}" class="day-section${hiddenAttr}"><h2 class="text-lg font-semibold mb-4 text-indigo-400">📅 ${dateLabel}</h2>${inner}</section>`;
+        });
+        contentHtml += '</div>';
+
+        eventsListEl.innerHTML = tabsHtml + contentHtml;
+
+        // Wire up tab click behavior and persist selection
+        document.querySelectorAll('.day-tab').forEach(btn => {
+            btn.addEventListener('click', (ev) => {
+                const btnEl = ev.currentTarget;
+                const date = btnEl.dataset.date;
+
+                // Save selection in-memory for auto refreshes
+                selectedEventDate = date;
+
+                document.querySelectorAll('.day-tab').forEach(b => {
+                    b.classList.remove('bg-indigo-600', 'text-white');
+                    b.classList.add('bg-gray-800', 'text-gray-300');
+                });
+
+                // Activate clicked
+                btnEl.classList.add('bg-indigo-600', 'text-white');
+                btnEl.classList.remove('bg-gray-800', 'text-gray-300');
+
+                // Show/hide sections
+                document.querySelectorAll('.day-section').forEach(sec => {
+                    if (sec.id === `day-${date}`) {
+                        sec.classList.remove('hidden');
+                    } else {
+                        sec.classList.add('hidden');
+                    }
+                });
+            });
+        });
     }
 
     function updateDashboard(data) {
@@ -333,4 +463,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Set interval to refresh data
     setInterval(fetchData, REFRESH_INTERVAL);
+    // Refresh economic events every 5 minutes
+    setInterval(fetchEconomicEvents, 300000);
 });

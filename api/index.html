@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EA Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .card-bg { background-color: #0b1120; }
+        .inner-card { background-color: #111827; }
+    </style>
     <link rel="stylesheet" href="style.css">
 </head>
 <body class="page-shell">
@@ -51,6 +58,20 @@
                 <div class="glass-card profit-card">
                     <h3>Monthly Profit</h3>
                     <p id="monthly-profit" class="value positive">$0.00</p>
+                </div>
+            </section>
+
+            <section class="glass-card news-card" id="economic-events-container">
+                <div class="card-header">
+                    <div>
+                        <h2>ข่าวเศรษฐกิจสำคัญ (High Impact)</h2>
+                        <p class="subtitle">ติดตามข่าวสำคัญประจำสัปดาห์ แยกตามวัน (ดีฟอลต์: วันนี้)</p>
+                    </div>
+                    <div id="economic-events-meta" class="text-muted"></div>
+                </div>
+
+                <div class="card-body" id="events-list">
+                    <p class="text-muted">Loading economic events…</p>
                 </div>
             </section>
 

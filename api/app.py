@@ -1,7 +1,8 @@
 import os
 import pymysql
 import json
-from datetime import datetime
+import requests
+from datetime import datetime, timedelta
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
@@ -28,6 +29,154 @@ def get_db_connection():
     except pymysql.MySQLError as e:
         print(f"Error while connecting to MySQL: {e}")
         return None
+
+
+# --- Economic calendar cache settings ---
+CACHE_FILE = os.path.join(os.path.dirname(__file__), 'ff_calendar_cache.json')
+CACHE_TTL_SECONDS = 3600  # 1 hour
+FF_CALENDAR_URL = 'https://nfs.faireconomy.media/ff_calendar_thisweek.json'
+
+
+def _read_cache_file():
+    if not os.path.exists(CACHE_FILE):
+        return None
+    try:
+        with open(CACHE_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def _write_cache_file(payload):
+    try:
+        with open(CACHE_FILE, 'w', encoding='utf-8') as f:
+            json.dump(payload, f)
+    except Exception as e:
+        print(f"Failed to write cache file: {e}")
+
+
+def _is_cache_fresh(cached):
+    if not cached or 'fetched_at' not in cached:
+        return False
+    try:
+        fetched = datetime.fromisoformat(cached['fetched_at'])
+    except Exception:
+        return False
+    return (datetime.utcnow() - fetched) < timedelta(seconds=CACHE_TTL_SECONDS)
+
+
+def _fetch_remote_calendar():
+    try:
+        resp = requests.get(FF_CALENDAR_URL, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        payload = {'fetched_at': datetime.utcnow().isoformat(), 'raw': data}
+        _write_cache_file(payload)
+        return payload
+    except Exception as e:
+        print(f"Failed to fetch remote calendar: {e}")
+        return None
+
+
+def _get_calendar_payload():
+    # Try cache first
+    cached = _read_cache_file()
+    if _is_cache_fresh(cached):
+        return cached, True
+
+    # Cache is stale or missing; try to fetch remote
+    remote = _fetch_remote_calendar()
+    if remote:
+        return remote, False
+
+    # If remote failed but we have any cached data, return stale cache
+    if cached:
+        return cached, True
+
+    # Nothing available
+    return {'fetched_at': None, 'raw': []}, True
+
+
+def _filter_today_high_usd(raw_list):
+    # Backwards-compatible: keep the original function behavior
+    today = datetime.utcnow().date().isoformat()
+    filtered = []
+    for ev in raw_list:
+        try:
+            impact = ev.get('impact') or ev.get('importance') or ev.get('impact_level')
+            if isinstance(impact, str) and impact.lower() != 'high':
+                continue
+
+                # Keep all countries; only filter by High impact
+
+            is_today = False
+            for k in ('date', 'date_str', 'time', 'datetime', 'local_date'):
+                v = ev.get(k)
+                if isinstance(v, str) and v.startswith(today):
+                    is_today = True
+                    break
+            if not is_today and 'timestamp' in ev:
+                try:
+                    ts = int(ev.get('timestamp'))
+                    if datetime.utcfromtimestamp(ts).date().isoformat() == today:
+                        is_today = True
+                except Exception:
+                    pass
+
+            if not is_today:
+                continue
+
+            filtered.append(ev)
+        except Exception:
+            continue
+    return filtered
+
+
+def _group_week_high_usd(raw_list):
+    """Return a dict mapping ISO date -> list of high-impact USD events for that date."""
+    def _get_event_date_iso(ev):
+        # Try several fields to extract a date
+        for k in ('date', 'date_str', 'local_date', 'datetime', 'time'):
+            v = ev.get(k)
+            if isinstance(v, str):
+                # If it starts with YYYY-MM-DD, return that
+                if len(v) >= 10 and v[4] == '-' and v[7] == '-':
+                    return v[:10]
+                # Try ISO parse
+                try:
+                    d = datetime.fromisoformat(v)
+                    return d.date().isoformat()
+                except Exception:
+                    pass
+        # timestamp fallback
+        if 'timestamp' in ev:
+            try:
+                ts = int(ev.get('timestamp'))
+                return datetime.utcfromtimestamp(ts).date().isoformat()
+            except Exception:
+                pass
+        return None
+
+    grouped = {}
+    for ev in raw_list:
+        try:
+            impact = ev.get('impact') or ev.get('importance') or ev.get('impact_level')
+            if isinstance(impact, str) and impact.lower() != 'high':
+                continue
+            # Keep all countries; only filter by High impact
+
+            date_iso = _get_event_date_iso(ev)
+            if not date_iso:
+                continue
+
+            grouped.setdefault(date_iso, []).append(ev)
+        except Exception:
+            continue
+
+    # Ensure keys for the 7-day window (use dates present in grouped only)
+    # Sort dates
+    sorted_grouped = {k: grouped[k] for k in sorted(grouped.keys())}
+    return sorted_grouped
 
 
 def ensure_table_exists(conn):
@@ -143,6 +292,43 @@ def update_ea_data():
 def health_check():
     """A simple health check endpoint to verify that the API is running."""
     return jsonify({"status": "ok", "message": "API is running"}), 200
+
+
+@app.route('/api/economic-events', methods=['GET'])
+def economic_events():
+    """Returns today's High-impact USD events using a 1-hour cached payload."""
+    try:
+        payload, from_cache = _get_calendar_payload()
+        raw = payload.get('raw') if payload else []
+        # Some feeds are objects with a top-level list under a key, try to handle both
+        if isinstance(raw, dict):
+            # pick the first list-like value
+            lists = [v for v in raw.values() if isinstance(v, list)]
+            raw_list = lists[0] if lists else []
+        elif isinstance(raw, list):
+            raw_list = raw
+        else:
+            raw_list = []
+
+        # Group events by date (only days that have events)
+        events_by_date = _group_week_high_usd(raw_list)
+
+        # Build a full Monday-Sunday week range containing today
+        today = datetime.utcnow().date()
+        start_of_week = today - timedelta(days=today.weekday())  # Monday
+        week_dates = [(start_of_week + timedelta(days=i)).isoformat() for i in range(7)]
+
+        # Ensure every day in the week is present (empty list when no events)
+        events_by_date_full = {d: events_by_date.get(d, []) for d in week_dates}
+
+        return jsonify({
+            'source': 'cache' if from_cache else 'remote',
+            'fetched_at': payload.get('fetched_at'),
+            'dates': week_dates,
+            'events_by_date': events_by_date_full
+        }), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
 @app.route('/api/dashboard', methods=['GET'])
