@@ -301,21 +301,24 @@ body {
 }
 
 .modal {
-    display: none;
+    display: none; /* Changed to 'flex' by JS to enable vertical centering */
     position: fixed;
     z-index: 1000;
     left: 0;
     top: 0;
     width: 100%;
     height: 100%;
-    overflow: auto;
+    overflow-y: auto; /* Allow scrolling on the container if modal is too tall */
     background-color: rgba(0, 0, 0, 0.72);
-    padding-top: 60px;
+    /* Use flexbox to better control vertical alignment */
+    align-items: flex-start; /* Align modal content to the top of the container */
+    justify-content: center; /* Center modal content horizontally */
+    padding: 8vh 16px; /* Use viewport height for top padding to push it down slightly from the top edge */
 }
 
 .modal-content {
     background-color: rgba(15, 23, 42, 0.98);
-    margin: 5% auto;
+    margin: 0; /* Let flexbox on parent control the positioning */
     padding: 24px 28px;
     border: 1px solid rgba(255, 255, 255, 0.08);
     width: min(92%, 640px);
@@ -332,7 +335,7 @@ body {
 .close-button {
     color: #cbd5e0;
     position: absolute;
-    top: 12px;
+    top: 10px;
     right: 18px;
     font-size: 28px;
     font-weight: bold;
@@ -449,5 +452,244 @@ body {
     .accounts-table-container th,
     .accounts-table-container td {
         white-space: nowrap;
+    }
+}
+
+/* --- Monthly Profit Calendar Styles --- */
+.monthly-calendar-modal {
+    /* Override default modal width to be wider for the calendar grid */
+    width: min(95%, 700px);
+}
+
+.calendar-header {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 28px;
+    padding-bottom: 20px;
+    /* Add margin-top to create space for the absolutely positioned close button, preventing overlap. */
+    margin-top: 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.calendar-header h2 {
+    margin: 0;
+    text-align: center;
+    color: var(--highlight);
+    font-size: 1.4rem;
+    letter-spacing: 0.5px;
+}
+
+.calendar-nav-btn {
+    padding: 10px 16px;
+    background: rgba(56, 189, 248, 0.15);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    color: var(--highlight);
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+}
+
+.calendar-nav-btn:hover {
+    background: rgba(56, 189, 248, 0.25);
+    border-color: rgba(56, 189, 248, 0.5);
+    transform: translateY(-1px);
+}
+
+.calendar-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 16px;
+    margin-bottom: 28px;
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 14px 16px;
+    background: rgba(56, 189, 248, 0.08);
+    border: 1px solid rgba(56, 189, 248, 0.2);
+    border-radius: 12px;
+    text-align: center;
+}
+
+.stat-label {
+    color: var(--muted);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+}
+
+.stat-value {
+    color: var(--highlight);
+    font-size: 1.3rem;
+    font-weight: 700;
+}
+
+.stat-value.loss {
+    color: var(--danger);
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+    margin-bottom: 24px;
+}
+
+.day-header {
+    text-align: center;
+    padding: 12px 8px;
+    color: var(--muted);
+    font-weight: 700;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.calendar-days {
+    display: contents;
+}
+
+.calendar-day {
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    padding: 5px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    cursor: default;
+    transition: all 0.2s ease;
+    background: rgba(148, 163, 184, 0.06);
+    min-height: 64px;
+}
+
+.calendar-day.empty {
+    opacity: 0.3;
+    cursor: default;
+}
+
+.calendar-day.profit {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.05));
+    border-color: rgba(16, 185, 129, 0.3);
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.1);
+}
+
+.calendar-day.loss {
+    background: linear-gradient(135deg, rgba(244, 62, 94, 0.15), rgba(244, 62, 94, 0.05));
+    border-color: rgba(244, 62, 94, 0.3);
+    box-shadow: 0 0 12px rgba(244, 62, 94, 0.1);
+}
+
+.calendar-day:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.calendar-day.profit:hover {
+    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.2);
+    border-color: rgba(16, 185, 129, 0.5);
+}
+
+.calendar-day.loss:hover {
+    box-shadow: 0 4px 16px rgba(244, 62, 94, 0.2);
+    border-color: rgba(244, 62, 94, 0.5);
+}
+
+.calendar-day-num {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text);
+}
+
+.calendar-day-profit {
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.calendar-day.profit .calendar-day-profit {
+    color: var(--success);
+}
+
+.calendar-day.loss .calendar-day-profit {
+    color: var(--danger);
+}
+
+.calendar-day.empty .calendar-day-profit {
+    color: var(--muted);
+}
+
+.calendar-legend {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+.legend-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.monthly-close {
+    display: none !important;
+}
+
+/* Show close button in monthly calendar */
+.modal#monthly-profit-modal .close-button {
+    display: block !important;
+}
+
+@media (max-width: 640px) {
+    .monthly-calendar-modal {
+        max-width: calc(100vw - 32px);
+    }
+
+    .calendar-header {
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .calendar-header h2 {
+        width: 100%;
+        font-size: 1.2rem;
+    }
+
+    .calendar-nav-btn {
+        flex: 1;
+        min-width: 100px;
+    }
+
+    .calendar-day {
+        min-height: 60px;
+        font-size: 0.85rem;
+    }
+
+    .calendar-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .calendar-legend {
+        gap: 16px;
+        font-size: 0.85rem;
     }
 }

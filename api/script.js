@@ -407,7 +407,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
 
-        modal.style.display = 'block';
+        modal.style.display = 'flex';
     }
 
     function generateTradesTable(trades) {
@@ -455,6 +455,214 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('click', (event) => {
         if (event.target == modal) {
             closeModal();
+        }
+    });
+
+    // --- Monthly Profit Calendar ---
+    const monthlyProfitCard = document.getElementById('monthly-profit-card');
+    const monthlyProfitModal = document.getElementById('monthly-profit-modal');
+    const monthlyCloseBtn = document.querySelector('.monthly-close');
+    const calendarMonthTitle = document.getElementById('calendar-month-title');
+    const calendarTotalProfit = document.getElementById('calendar-total-profit');
+    const calendarProfitDays = document.getElementById('calendar-profit-days');
+    const calendarLossDays = document.getElementById('calendar-loss-days');
+    const calendarDaysContainer = document.getElementById('calendar-days');
+    const prevMonthBtn = document.getElementById('prev-month');
+    const nextMonthBtn = document.getElementById('next-month');
+
+    // Debug: Check if elements were found
+    console.log('monthlyProfitCard:', monthlyProfitCard);
+    console.log('monthlyProfitModal:', monthlyProfitModal);
+    console.log('calendarDaysContainer:', calendarDaysContainer);
+    
+    if (monthlyProfitCard === null) {
+        console.error('ERROR: monthlyProfitCard element was NOT found in the DOM!');
+    }
+    if (monthlyProfitModal === null) {
+        console.error('ERROR: monthlyProfitModal element was NOT found in the DOM!');
+    }
+
+    let currentCalendarYear = new Date().getFullYear();
+    let currentCalendarMonth = new Date().getMonth() + 1;
+    let availableCalendarMonths = [];
+
+    async function fetchMonthlyProfitDetails(year, month) {
+        try {
+            console.log(`Fetching monthly profit details for ${year}-${month}`);
+            const url = `/api/monthly_profit_details?year=${year}&month=${month}`;
+            console.log('Fetching from:', url);
+            const response = await fetch(url);
+            console.log('Response status:', response.status);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            console.log('Data received:', data);
+            renderCalendar(data);
+        } catch (error) {
+            console.error('Failed to fetch monthly profit details:', error);
+            if (calendarDaysContainer) {
+                calendarDaysContainer.innerHTML = '<p style="grid-column: 1/-1; text-align: center;">Unable to load calendar data.</p>';
+            }
+        }
+    }
+
+    function updateCalendarNavButtons() {
+        const now = new Date();
+        // Disable 'Next' button if the current view is the current month or in the future.
+        const isFutureOrCurrentMonth = (currentCalendarYear > now.getFullYear()) ||
+                                     (currentCalendarYear === now.getFullYear() && currentCalendarMonth >= now.getMonth() + 1);
+        if (nextMonthBtn) {
+            nextMonthBtn.disabled = isFutureOrCurrentMonth;
+            nextMonthBtn.style.opacity = isFutureOrCurrentMonth ? '0.5' : '1';
+        }
+
+        // Disable 'Previous' button if we are at or before the oldest month with data.
+        let isAtOrBeforeOldest = false;
+        if (availableCalendarMonths && availableCalendarMonths.length > 0) {
+            const oldestMonth = availableCalendarMonths[availableCalendarMonths.length - 1];
+            isAtOrBeforeOldest = (currentCalendarYear < oldestMonth.year) ||
+                                 (currentCalendarYear === oldestMonth.year && currentCalendarMonth <= oldestMonth.month);
+        } else {
+            // If there's no history, disable going back.
+            isAtOrBeforeOldest = true;
+        }
+
+        if (prevMonthBtn) {
+            prevMonthBtn.disabled = isAtOrBeforeOldest;
+            prevMonthBtn.style.opacity = isAtOrBeforeOldest ? '0.5' : '1';
+        }
+    }
+
+    function renderCalendar(data) {
+        console.log('renderCalendar called with data:', data);
+        
+        if (Array.isArray(data.available_months)) {
+            availableCalendarMonths = data.available_months;
+        }
+
+        // Update header
+        if (calendarMonthTitle) {
+            calendarMonthTitle.textContent = data.month_name;
+        }
+        if (calendarTotalProfit) {
+            calendarTotalProfit.textContent = formatProfit(data.total_profit);
+            calendarTotalProfit.className = data.total_profit >= 0 ? 'stat-value' : 'stat-value loss';
+        }
+
+        // Calculate stats
+        const profitDays = data.calendar.filter(day => day.profit > 0).length;
+        const lossDays = data.calendar.filter(day => day.profit < 0).length;
+        if (calendarProfitDays) {
+            calendarProfitDays.textContent = profitDays;
+        }
+        if (calendarLossDays) {
+            calendarLossDays.textContent = lossDays;
+        }
+
+        // Build calendar grid
+        let calendarHtml = '';
+        const firstDay = new Date(data.year, data.month - 1, 1).getDay();
+        
+        // Add empty cells for days before the month starts
+        for (let i = 0; i < firstDay; i++) {
+            calendarHtml += '<div class="calendar-day empty"></div>';
+        }
+
+        // Add day cells
+        data.calendar.forEach(day => {
+            const profitClass = day.profit > 0 ? 'profit' : day.profit < 0 ? 'loss' : 'empty';
+            const profitDisplay = day.profit !== 0 ? formatProfit(day.profit) : '-';
+            
+            calendarHtml += `
+                <div class="calendar-day ${profitClass}" title="${day.date}: ${profitDisplay}">
+                    <div class="calendar-day-num">${day.day}</div>
+                    <div class="calendar-day-profit">${profitDisplay}</div>
+                </div>
+            `;
+        });
+
+        if (calendarDaysContainer) {
+            calendarDaysContainer.innerHTML = calendarHtml;
+            console.log('Calendar rendered successfully');
+        } else {
+            console.error('calendarDaysContainer is null!');
+        }
+
+        updateCalendarNavButtons();
+    }
+
+    function openMonthlyProfitModal() {
+        console.log('openMonthlyProfitModal called');
+        if (monthlyProfitModal) {
+            monthlyProfitModal.style.display = 'flex';
+            console.log('Modal display set to block');
+            fetchMonthlyProfitDetails(currentCalendarYear, currentCalendarMonth);
+        } else {
+            console.error('monthlyProfitModal is null!');
+        }
+    }
+
+    function closeMonthlyProfitModal() {
+        monthlyProfitModal.style.display = 'none';
+    }
+
+    function goToPreviousMonth() {
+        if (currentCalendarMonth === 1) {
+            currentCalendarMonth = 12;
+            currentCalendarYear--;
+        } else {
+            currentCalendarMonth--;
+        }
+        fetchMonthlyProfitDetails(currentCalendarYear, currentCalendarMonth);
+    }
+
+    function goToNextMonth() {
+        // The check for future months is now handled by disabling the button.
+        if (currentCalendarMonth === 12) {
+            currentCalendarMonth = 1;
+            currentCalendarYear++;
+        } else {
+            currentCalendarMonth++;
+        }
+        fetchMonthlyProfitDetails(currentCalendarYear, currentCalendarMonth);
+    }
+
+    // Event listeners
+    if (monthlyProfitCard) {
+        monthlyProfitCard.addEventListener('click', openMonthlyProfitModal);
+        console.log('Monthly profit card click listener attached');
+    } else {
+        console.error('monthlyProfitCard element not found!');
+    }
+    
+    if (monthlyProfitModal) {
+        const monthlyCloseButton = monthlyProfitModal.querySelector('.close-button');
+        if (monthlyCloseButton) {
+            monthlyCloseButton.addEventListener('click', closeMonthlyProfitModal);
+            console.log('Monthly close button listener attached');
+        } else {
+            console.error('Monthly close button not found inside modal!');
+        }
+    } else {
+        console.error('monthlyProfitModal element not found!');
+    }
+    
+    if (prevMonthBtn) {
+        prevMonthBtn.addEventListener('click', goToPreviousMonth);
+    } else {
+        console.error('prevMonthBtn element not found!');
+    }
+    
+    if (nextMonthBtn) {
+        nextMonthBtn.addEventListener('click', goToNextMonth);
+    } else {
+        console.error('nextMonthBtn element not found!');
+    }
+
+    window.addEventListener('click', (event) => {
+        if (event.target === monthlyProfitModal) {
+            closeMonthlyProfitModal();
         }
     });
 

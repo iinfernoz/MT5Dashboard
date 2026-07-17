@@ -55,9 +55,10 @@
                     <h3>Weekly Profit</h3>
                     <p id="weekly-profit" class="value positive">$0.00</p>
                 </div>
-                <div class="glass-card profit-card">
+                <div class="glass-card profit-card" id="monthly-profit-card" style="cursor: pointer;">
                     <h3>Monthly Profit</h3>
                     <p id="monthly-profit" class="value positive">$0.00</p>
+                    <p style="font-size: 0.75rem; color: var(--muted); margin-top: 8px;">Click to view calendar</p>
                 </div>
             </section>
 
@@ -95,6 +96,62 @@
             <h2 id="modal-account-name">Account Details</h2>
             <div id="modal-body">
                 <!-- Details will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Monthly Profit Calendar Modal -->
+    <div id="monthly-profit-modal" class="modal">
+        <div class="modal-content monthly-calendar-modal">
+            <span class="close-button monthly-close">&times;</span>
+            <div class="calendar-header">
+                <button id="prev-month" class="calendar-nav-btn">← Previous</button>
+                <h2 id="calendar-month-title">Monthly Profit</h2>
+                <button id="next-month" class="calendar-nav-btn">Next →</button>
+            </div>
+            
+            <div class="calendar-stats">
+                <div class="stat-item">
+                    <span class="stat-label">Total Profit</span>
+                    <span class="stat-value" id="calendar-total-profit">$0.00</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Profitable Days</span>
+                    <span class="stat-value" id="calendar-profit-days">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Loss Days</span>
+                    <span class="stat-value loss" id="calendar-loss-days">0</span>
+                </div>
+            </div>
+            
+            <div class="calendar-grid">
+                <div class="day-header">Sun</div>
+                <div class="day-header">Mon</div>
+                <div class="day-header">Tue</div>
+                <div class="day-header">Wed</div>
+                <div class="day-header">Thu</div>
+                <div class="day-header">Fri</div>
+                <div class="day-header">Sat</div>
+                
+                <div id="calendar-days" class="calendar-days">
+                    <!-- Days will be populated by JavaScript -->
+                </div>
+            </div>
+            
+            <div class="calendar-legend">
+                <div class="legend-item">
+                    <span class="legend-color" style="background: var(--success);"></span>
+                    <span>Profit</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-color" style="background: var(--danger);"></span>
+                    <span>Loss</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-color" style="background: rgba(148, 163, 184, 0.2);"></span>
+                    <span>No Data</span>
+                </div>
             </div>
         </div>
     </div>

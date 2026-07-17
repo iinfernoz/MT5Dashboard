@@ -538,3 +538,124 @@ def get_equity_history():
     finally:
         if conn:
             conn.close()
+
+
+@app.route('/api/monthly_profit_details', methods=['GET'])
+def get_monthly_profit_details():
+    """
+    Retrieves daily profit breakdown for a given month.
+    Query parameters:
+      - year: int (default: current year)
+      - month: int (default: current month, 1-12)
+    
+    Returns a dict with daily profit data and metadata about the month.
+    """
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"status": "error", "message": "Could not connect to the database"}), 503
+
+    try:
+        ensure_table_exists(conn)
+        
+        # Parse query parameters
+        year = request.args.get('year', default=datetime.utcnow().year, type=int)
+        month = request.args.get('month', default=datetime.utcnow().month, type=int)
+        
+        # Validate month
+        if month < 1 or month > 12:
+            month = datetime.utcnow().month
+        if year < 1:
+            year = datetime.utcnow().year
+        
+        # Calculate start and end of month
+        start_of_month = datetime(year, month, 1, 0, 0, 0, 0)
+        if month == 12:
+            end_of_month = datetime(year + 1, 1, 1, 0, 0, 0, 0) - timedelta(seconds=1)
+        else:
+            end_of_month = datetime(year, month + 1, 1, 0, 0, 0, 0) - timedelta(seconds=1)
+        
+        # Query daily profits for each day in the month
+        sql = """
+            SELECT
+                DATE(received_at) AS profit_date,
+                MAX(profit) AS final_daily_profit
+            FROM account_data
+            WHERE received_at >= %s AND received_at <= %s
+            GROUP BY DATE(received_at), account_number
+            ORDER BY DATE(received_at);
+        """
+        
+        with conn.cursor() as cursor:
+            cursor.execute(sql, (start_of_month, end_of_month))
+            daily_records = cursor.fetchall()
+        
+        # Aggregate daily profits by date (sum across all accounts)
+        daily_profits = {}
+        for record in daily_records:
+            date_str = record['profit_date'].isoformat() if record['profit_date'] else None
+            if date_str:
+                profit_cents = record['final_daily_profit']
+                profit_usd = float(profit_cents) / 100.0 if profit_cents is not None else 0.0
+                
+                if date_str in daily_profits:
+                    daily_profits[date_str] += profit_usd
+                else:
+                    daily_profits[date_str] = profit_usd
+        
+        # Calculate total monthly profit
+        total_monthly = sum(daily_profits.values())
+        
+        # Build calendar data with all days in month
+        import calendar
+        cal = calendar.monthcalendar(year, month)
+        
+        # Prepare calendar data for frontend
+        calendar_data = []
+        for week in cal:
+            for day_num in week:
+                if day_num == 0:  # Days from other months
+                    continue
+                date_obj = datetime(year, month, day_num).date()
+                date_iso = date_obj.isoformat()
+                profit = daily_profits.get(date_iso, 0.0)
+                day_name = date_obj.strftime('%a')  # Mon, Tue, etc.
+                
+                calendar_data.append({
+                    'day': day_num,
+                    'date': date_iso,
+                    'profit': profit,
+                    'day_name': day_name
+                })
+        
+        # Get available months from data
+        sql_months = """
+            SELECT DISTINCT YEAR(received_at) as yr, MONTH(received_at) as mth
+            FROM account_data
+            ORDER BY yr DESC, mth DESC
+            LIMIT 24;
+        """
+        
+        with conn.cursor() as cursor:
+            cursor.execute(sql_months)
+            available_months = cursor.fetchall()
+        
+        available_months_list = [
+            {'year': m['yr'], 'month': m['mth']} 
+            for m in available_months
+        ]
+        
+        return jsonify({
+            'year': year,
+            'month': month,
+            'month_name': datetime(year, month, 1).strftime('%B %Y'),
+            'total_profit': total_monthly,
+            'calendar': calendar_data,
+            'available_months': available_months_list
+        }), 200
+        
+    except Exception as e:
+        print(f"Monthly Profit Details Error: {e}")
+        return jsonify({"status": "error", "message": "Failed to retrieve monthly profit details"}), 500
+    finally:
+        if conn:
+            conn.close()
