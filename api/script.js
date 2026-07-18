@@ -118,42 +118,90 @@ document.addEventListener('DOMContentLoaded', () => {
         // Content sections
         let contentHtml = '<div id="newsContainer">';
         dates.forEach(d => {
-            const list = Array.isArray(byDate[d]) ? byDate[d] : [];
             const dateLabel = new Date(d).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+            const list = Array.isArray(byDate[d]) ? byDate[d] : [];
             let inner = '';
+
             if (list.length === 0) {
                 inner = '<p class="text-gray-400">ไม่มีข่าว</p>';
             } else {
-                inner = '<div class="space-y-3">' + list.map(ev => {
-                    const title = ev.title || ev.event || ev.name || ev.description || 'Untitled';
-                    // Normalize and convert time to Thailand timezone, display only HH:MM (24h)
+                // Group events by time, country, and impact to match the requested table format
+                const eventsByGroup = {};
+                list.forEach(ev => {
                     let parsedTime = null;
                     const timeCandidates = [ev.date, ev.datetime, ev.time, ev.local_date];
                     for (const t of timeCandidates) {
                         if (!t) continue;
                         const d = new Date(t);
-                        if (!isNaN(d.getTime())) { parsedTime = d; break; }
+                        if (!isNaN(d.getTime())) {
+                            parsedTime = d;
+                            break;
+                        }
                     }
                     if (!parsedTime && ev.timestamp) {
                         const ts = Number(ev.timestamp);
                         if (!isNaN(ts)) parsedTime = new Date(ts * 1000);
                     }
-                    let time = '';
+                    let time = 'N/A';
                     if (parsedTime) {
                         time = new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Bangkok' }).format(parsedTime);
                     }
-                    const country = ev.country || ev.currency || ev.country_iso || '';
-                    const impact = (ev.impact || ev.importance || 'High').toString().toUpperCase();
-                    return `
-                        <div class="flex items-center justify-between p-4 bg-gray-900 rounded-xl border border-gray-800">
-                            <div>
-                                <h3 class="font-bold text-white">${title}</h3>
-                                <p class="text-sm text-gray-400">${country} · ${time}</p>
-                            </div>
-                            <span class="px-3 py-1 bg-red-900/30 text-red-400 text-xs font-bold rounded-full border border-red-900/50">${impact}</span>
-                        </div>
+
+                    const country = ev.country || ev.currency || ev.country_iso || 'N/A';
+                    const impact = (ev.impact || ev.importance || ev.impact_level || 'LOW').toString().toUpperCase();
+                    const title = ev.title || ev.event || ev.name || ev.description || 'Untitled';
+
+                    const groupKey = `${time}-${country}-${impact}`;
+                    if (!eventsByGroup[groupKey]) {
+                        eventsByGroup[groupKey] = { time, country, impact, events: [] };
+                    }
+                    eventsByGroup[groupKey].events.push(title);
+                });
+
+                // Sort groups by time
+                const sortedGroups = Object.values(eventsByGroup).sort((a, b) => a.time.localeCompare(b.time));
+
+                inner = `
+                    <table class="economic-events-table">
+                        <thead>
+                            <tr>
+                                <th class="w-1/6">เวลา</th>
+                                <th class="w-1/6">ประเทศ</th>
+                                <th class="w-1/4">ระดับความรุนแรง</th>
+                                <th>ข่าวสำคัญ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                sortedGroups.forEach(group => {
+                    let impactIcon = '⚪';
+                    let impactBadgeClass = 'impact-badge-low';
+                    if (group.impact === 'HIGH') {
+                        impactIcon = '🔴';
+                        impactBadgeClass = 'impact-badge-high';
+                    } else if (group.impact === 'MEDIUM') {
+                        impactIcon = '🟠';
+                        impactBadgeClass = 'impact-badge-medium';
+                    } else if (group.impact === 'LOW') {
+                        impactIcon = '🟡';
+                        impactBadgeClass = 'impact-badge-low';
+                    }
+
+                    const eventTitles = group.events.map(title => `• ${title}`).join('<br>');
+                    const impactContent = `<span class="impact-badge ${impactBadgeClass}">${impactIcon} ${group.impact}</span>`;
+
+                    inner += `
+                        <tr>
+                            <td data-label="เวลา" class="time-cell">${group.time}</td>
+                            <td data-label="ประเทศ" class="country-cell">${group.country}</td>
+                            <td data-label="ระดับความรุนแรง" class="impact-cell">${impactContent}</td>
+                            <td data-label="ข่าวสำคัญ" class="event-title">${eventTitles}</td>
+                        </tr>
                     `;
-                }).join('') + '</div>';
+                });
+
+                inner += '</tbody></table>';
             }
             const hiddenAttr = (d === activeDate) ? '' : ' hidden';
             contentHtml += `<section id="day-${d}" class="day-section${hiddenAttr}"><h2 class="text-lg font-semibold mb-4 text-indigo-400">📅 ${dateLabel}</h2>${inner}</section>`;

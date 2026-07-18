@@ -132,10 +132,9 @@ def _filter_today_high_usd(raw_list):
     return filtered
 
 
-def _group_week_high_usd(raw_list):
-    """Return a dict mapping ISO date -> list of high-impact USD events for that date."""
+def _group_week_events_by_date(raw_list):
+    """Return a dict mapping ISO date -> list of all events for that date."""
     def _get_event_date_iso(ev):
-        # Try several fields to extract a date
         for k in ('date', 'date_str', 'local_date', 'datetime', 'time'):
             v = ev.get(k)
             if isinstance(v, str):
@@ -160,10 +159,13 @@ def _group_week_high_usd(raw_list):
     grouped = {}
     for ev in raw_list:
         try:
-            impact = ev.get('impact') or ev.get('importance') or ev.get('impact_level')
-            if isinstance(impact, str) and impact.lower() != 'high':
-                continue
-            # Keep all countries; only filter by High impact
+            # Filter for Medium and High impact events only
+            impact_val = ev.get('impact') or ev.get('importance') or ev.get('impact_level')
+            if not impact_val or not isinstance(impact_val, str):
+                continue  # Skip events without a valid impact rating
+
+            if impact_val.lower() not in ['medium', 'high']:
+                continue  # Skip low-impact and other events
 
             date_iso = _get_event_date_iso(ev)
             if not date_iso:
@@ -173,8 +175,6 @@ def _group_week_high_usd(raw_list):
         except Exception:
             continue
 
-    # Ensure keys for the 7-day window (use dates present in grouped only)
-    # Sort dates
     sorted_grouped = {k: grouped[k] for k in sorted(grouped.keys())}
     return sorted_grouped
 
@@ -311,7 +311,7 @@ def economic_events():
             raw_list = []
 
         # Group events by date (only days that have events)
-        events_by_date = _group_week_high_usd(raw_list)
+        events_by_date = _group_week_events_by_date(raw_list)
 
         # Build a full Monday-Sunday week range containing today
         today = datetime.utcnow().date()
