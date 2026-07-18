@@ -478,11 +478,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const now = new Date();
             const minutesDiff = isNaN(lastUpdate) ? Infinity : (now - lastUpdate) / 1000 / 60;
             const statusClass = minutesDiff > 5 ? 'status-offline' : 'status-online';
-            const statusText = minutesDiff > 5 ? 'Offline' : 'Online';
 
             tableHTML += `
                 <tr class="clickable-row" data-account-number="${acc.account_number}">
-                    <td data-label="Status"><span class="status-dot ${statusClass}"></span><span class="status-label">${statusText}</span></td>
+                    <td data-label="Status" class="status-cell"><span class="status-dot ${statusClass}"></span></td>
                     <td data-label="Account">
                         <div class="account-cell">
                             <span class="account-name">${acc.account_name || 'N/A'}</span>
