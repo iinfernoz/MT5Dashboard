@@ -14,9 +14,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const monthlyProfitEl = document.getElementById('monthly-profit');
 
     const accountsTableContainer = document.getElementById('accounts-table-container');
-    const economicEventsContainer = document.getElementById('economic-events-container');
-    const eventsListEl = document.getElementById('events-list');
-    const eventsMetaEl = document.getElementById('economic-events-meta');
+    // New element IDs for the redesigned economic events section
+    const eventsListTabsEl = document.getElementById('events-list-tabs');
+    const eventsListHeaderEl = document.getElementById('events-list-header');
+    const eventsListContentEl = document.getElementById('events-list-content');
+
     const equityChartCanvas = document.getElementById('equity-chart');
     let equityChart = null;
     const EQUITY_HISTORY_URL = '/api/equity_history';
@@ -29,6 +31,31 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeButton = document.querySelector('.close-button');
     let currentAccountsData = []; // Store current data to use for the modal
     let selectedEventDate = null;
+    let collapsedGroups = {}; // For new economic events UI
+    let lastEventsPayload = null; // Cache last payload for re-renders
+
+    // Use event delegation for economic event tabs for efficiency and reliability.
+    // This listener is attached once to the container.
+    if (eventsListTabsEl) {
+        eventsListTabsEl.addEventListener('click', (ev) => {
+            // Find the button that was clicked
+            const btn = ev.target.closest('.day-tab');
+            if (!btn || !btn.dataset.date) return;
+
+            const date = btn.dataset.date;
+            // If the same date is clicked again, do nothing.
+            if (date === selectedEventDate) return;
+
+            // Update the state
+            selectedEventDate = date;
+            collapsedGroups = {}; // Reset collapse state on date change
+
+            // Re-render the component using the last fetched data
+            if (lastEventsPayload) {
+                renderEconomicEvents(lastEventsPayload);
+            }
+        });
+    }
 
     function formatCurrency(value) {
         return new Intl.NumberFormat('en-US', {
@@ -58,8 +85,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             currentAccountsData = data.accounts; // Save the latest account data
             updateDashboard(data);
-            await fetchEquityHistory();
-            await fetchEconomicEvents();
             updateStatus('connected', `Last updated: ${new Date().toLocaleTimeString()}`);
 
         } catch (error) {
@@ -68,176 +93,233 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function initialLoad() {
+        await fetchData();
+        await fetchEquityHistory();
+        await fetchEconomicEvents();
+    }
+
+
     async function fetchEconomicEvents() {
-        if (!eventsListEl) return;
+        if (!eventsListContentEl) return;
         try {
             const resp = await fetch(ECON_EVENTS_URL);
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             const body = await resp.json();
+            lastEventsPayload = body; // Cache the payload
             renderEconomicEvents(body);
         } catch (err) {
             console.error('Failed to fetch economic events:', err);
-            if (eventsListEl) eventsListEl.innerHTML = '<p style="padding:12px;">Unable to load events.</p>';
+            if (eventsListContentEl) eventsListContentEl.innerHTML = '<p style="padding:12px;">Unable to load events.</p>';
         }
     }
 
+    function toggleTimeGroup(groupKey) {
+        collapsedGroups[groupKey] = !collapsedGroups[groupKey];
+        if (lastEventsPayload) {
+            renderEconomicEvents(lastEventsPayload);
+        }
+    }
+
+    function toggleAllTimeGroups(expand) {
+        if (!lastEventsPayload || !selectedEventDate) return;
+
+        const rawData = (lastEventsPayload.events_by_date || {})[selectedEventDate] || [];
+        const groupKeys = new Set();
+
+        rawData.forEach(event => {
+            let parsedTime = null;
+            const timeCandidates = [event.date, event.datetime, event.time, event.local_date];
+            for (const t of timeCandidates) {
+                if (!t) continue;
+                const d = new Date(t);
+                if (!isNaN(d.getTime())) { parsedTime = d; break; }
+            }
+            if (!parsedTime && event.timestamp) {
+                const ts = Number(event.timestamp);
+                if (!isNaN(ts)) parsedTime = new Date(ts * 1000);
+            }
+            const time = parsedTime ? new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Bangkok' }).format(parsedTime) : 'N/A';
+            const country = event.country || event.currency || event.country_iso || 'N/A';
+            groupKeys.add(`${time}_${country}`);
+        });
+
+        groupKeys.forEach(key => {
+            collapsedGroups[key] = !expand;
+        });
+
+        renderEconomicEvents(lastEventsPayload);
+    }
+
+    window.toggleTimeGroup = toggleTimeGroup;
+    window.toggleAllTimeGroups = toggleAllTimeGroups;
+
+    // This function is completely rewritten to support the new timeline design.
     function renderEconomicEvents(payload) {
-        if (!eventsListEl) return;
-        // Do not display source/fetched meta per UX request
+        if (!eventsListContentEl || !eventsListTabsEl || !eventsListHeaderEl) return;
 
         const dates = Array.isArray(payload.dates) ? payload.dates : [];
         const byDate = payload.events_by_date || {};
 
         if (!dates || dates.length === 0) {
-            eventsListEl.innerHTML = '<p class="text-gray-300">ยังไม่มีข่าวสำคัญในสัปดาห์นี้</p>';
+            eventsListContentEl.innerHTML = '<p class="text-gray-300">ยังไม่มีข่าวสำคัญในสัปดาห์นี้</p>';
             return;
         }
 
         const todayIso = new Date().toISOString().slice(0, 10);
 
-        // Determine active date: keep previously selected if still available, otherwise prefer today, else first date
-        let activeDate = todayIso;
-        if (selectedEventDate && Array.isArray(dates) && dates.includes(selectedEventDate)) {
-            activeDate = selectedEventDate;
-        } else if (Array.isArray(dates) && dates.includes(todayIso)) {
-            activeDate = todayIso;
-        } else if (Array.isArray(dates) && dates.length) {
-            activeDate = dates[0];
+        // Determine active date
+        if (!selectedEventDate || !dates.includes(selectedEventDate)) {
+            selectedEventDate = dates.includes(todayIso) ? todayIso : dates[0];
         }
 
-        // Tabs
-        let tabsHtml = '<div class="flex space-x-2 overflow-x-auto pb-4 mb-4 border-b border-gray-800" id="dayTabs">';
+        // 1. Render Date Navigation Tabs
+        let tabsHtml = '<div class="flex items-center gap-1 overflow-x-auto pb-1.5 scrollbar-none" id="date-slider">';
         dates.forEach(d => {
-            const isActive = d === activeDate;
-            const label = (d === todayIso) ? 'วันนี้' : new Date(d).toLocaleDateString('th-TH', { day: '2-digit', month: 'short' });
-            const btnClasses = isActive ? 'px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium whitespace-nowrap transition-all' : 'px-4 py-2 bg-gray-800 text-gray-300 rounded-lg font-medium hover:bg-gray-700 whitespace-nowrap transition-all';
-            tabsHtml += `<button class="day-tab ${btnClasses}" data-date="${d}">${label}</button>`;
+            const dateObj = new Date(d);
+            const isToday = d === todayIso;
+            const isActive = d === selectedEventDate;
+
+            const weekday = dateObj.toLocaleDateString('th-TH', { weekday: 'short' });
+            const datePart = dateObj.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+            let displayLabel = `${weekday} ${datePart}`;
+            if (isToday) {
+                displayLabel += ' (วันนี้)';
+            }
+            const activeClass = isActive ? "bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/25 border-blue-500" : "bg-slate-900/60 hover:bg-slate-800 text-slate-300 border-slate-800/80 hover:text-white";
+            const indicatorDot = isToday ? `<span class="absolute top-1 right-1.5 w-1 h-1 rounded-full bg-[#3b82f6]"></span>` : "";
+            tabsHtml += `<button class="day-tab relative flex-shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-semibold border transition-all duration-200 ${activeClass}" data-date="${d}">${displayLabel} ${indicatorDot}</button>`;
         });
         tabsHtml += '</div>';
+        eventsListTabsEl.innerHTML = tabsHtml;
 
-        // Content sections
-        let contentHtml = '<div id="newsContainer">';
-        dates.forEach(d => {
-            const dateLabel = new Date(d).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
-            const list = Array.isArray(byDate[d]) ? byDate[d] : [];
-            let inner = '';
+        // 2. Render Header for the selected date
+        const currentDateLabel = new Date(selectedEventDate).toLocaleDateString('th-TH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        let headerHtml = `
+            <h3 class="font-bold text-sm md:text-base text-slate-200 flex items-center gap-1.5">
+                📅 ${currentDateLabel}
+            </h3>
+            <div class="flex gap-2">
+                <button onclick="toggleAllTimeGroups(false)" class="text-[10px] bg-slate-900 border border-slate-800 text-slate-400 hover:text-white px-2 py-1 rounded-md transition duration-200 flex items-center gap-1">
+                    <i class="fa-solid fa-compress text-[8px]"></i> ยุบทั้งหมด
+                </button>
+                <button onclick="toggleAllTimeGroups(true)" class="text-[10px] bg-slate-900 border border-slate-800 text-slate-400 hover:text-white px-2 py-1 rounded-md transition duration-200 flex items-center gap-1">
+                    <i class="fa-solid fa-expand text-[8px]"></i> ขยายทั้งหมด
+                </button>
+            </div>
+        `;
+        eventsListHeaderEl.innerHTML = headerHtml;
 
-            if (list.length === 0) {
-                inner = '<p class="text-gray-400">ไม่มีข่าว</p>';
-            } else {
-                // Group events by time, country, and impact to match the requested table format
-                const eventsByGroup = {};
-                list.forEach(ev => {
-                    let parsedTime = null;
-                    const timeCandidates = [ev.date, ev.datetime, ev.time, ev.local_date];
-                    for (const t of timeCandidates) {
-                        if (!t) continue;
-                        const d = new Date(t);
-                        if (!isNaN(d.getTime())) {
-                            parsedTime = d;
-                            break;
-                        }
-                    }
-                    if (!parsedTime && ev.timestamp) {
-                        const ts = Number(ev.timestamp);
-                        if (!isNaN(ts)) parsedTime = new Date(ts * 1000);
-                    }
-                    let time = 'N/A';
-                    if (parsedTime) {
-                        time = new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Bangkok' }).format(parsedTime);
-                    }
+        // 3. Render Content for the selected date
+        const list = byDate[selectedEventDate] || [];
+        if (list.length === 0) {
+            eventsListContentEl.innerHTML = `
+                <div class="flex flex-col items-center justify-center py-8 px-4 border border-dashed border-slate-800 rounded-xl text-center text-slate-500">
+                    <i class="fa-solid fa-calendar-minus text-2xl mb-2 text-slate-600"></i>
+                    <p class="text-xs font-semibold">ไม่พบข้อมูลข่าวสำหรับวันนี้</p>
+                </div>
+            `;
+            return;
+        }
 
-                    const country = ev.country || ev.currency || ev.country_iso || 'N/A';
-                    const impact = (ev.impact || ev.importance || ev.impact_level || 'LOW').toString().toUpperCase();
-                    const title = ev.title || ev.event || ev.name || ev.description || 'Untitled';
+        // Group events by time and country
+        const groups = {};
+        list.forEach(event => {
+            let parsedTime = null;
+            const timeCandidates = [event.date, event.datetime, event.time, event.local_date];
+            for (const t of timeCandidates) {
+                if (!t) continue;
+                const d = new Date(t);
+                if (!isNaN(d.getTime())) { parsedTime = d; break; }
+            }
+            if (!parsedTime && event.timestamp) {
+                const ts = Number(event.timestamp);
+                if (!isNaN(ts)) parsedTime = new Date(ts * 1000);
+            }
+            const time = parsedTime ? new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Bangkok' }).format(parsedTime) : 'N/A';
+            const country = event.country || event.currency || event.country_iso || 'N/A';
+            const groupKey = `${time}_${country}`;
+            if (!groups[groupKey]) {
+                groups[groupKey] = { time, country, key: groupKey, events: [] };
+            }
+            groups[groupKey].events.push(event);
+        });
 
-                    const groupKey = `${time}-${country}-${impact}`;
-                    if (!eventsByGroup[groupKey]) {
-                        eventsByGroup[groupKey] = { time, country, impact, events: [] };
-                    }
-                    eventsByGroup[groupKey].events.push(title);
-                });
+        const groupKeys = Object.keys(groups).sort((a, b) => a.split('_')[0].localeCompare(b.split('_')[0]));
+        let contentHtml = '';
 
-                // Sort groups by time
-                const sortedGroups = Object.values(eventsByGroup).sort((a, b) => a.time.localeCompare(b.time));
+        groupKeys.forEach((key, index) => {
+            const group = groups[key];
+            const isLast = index === groupKeys.length - 1;
+            const isCollapsed = collapsedGroups[group.key] || false;
 
-                inner = `
-                    <table class="economic-events-table">
-                        <thead>
-                            <tr>
-                                <th class="w-1/6">เวลา</th>
-                                <th class="w-1/6">ประเทศ</th>
-                                <th class="w-1/4">ระดับความรุนแรง</th>
-                                <th>ข่าวสำคัญ</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                `;
+            const timelineMarkup = `
+                <div class="flex flex-col items-center">
+                    <button onclick="toggleTimeGroup('${group.key}')" title="คลิกเพื่อยุบ/ขยายกลุ่มเวลานี้" class="w-10 h-10 rounded-xl bg-slate-900 border ${isCollapsed ? 'border-amber-500/40 bg-amber-950/10' : 'border-slate-800 hover:border-blue-500/50'} flex flex-col items-center justify-center shadow-md relative z-10 transition-all duration-200">
+                        <span class="text-xs font-bold text-blue-400 font-mono">${group.time}</span>
+                        ${isCollapsed ? '<span class="text-[7px] text-amber-500 font-bold leading-none -mt-0.5">ย่ออยู่</span>' : ''}
+                    </button>
+                    <div class="timeline-connector ${isLast ? 'timeline-connector-last' : ''}"></div>
+                </div>
+            `;
 
-                sortedGroups.forEach(group => {
-                    let impactIcon = '⚪';
-                    let impactBadgeClass = 'impact-badge-low';
-                    if (group.impact === 'HIGH') {
-                        impactIcon = '🔴';
-                        impactBadgeClass = 'impact-badge-high';
-                    } else if (group.impact === 'MEDIUM') {
-                        impactIcon = '🟠';
-                        impactBadgeClass = 'impact-badge-medium';
-                    } else if (group.impact === 'LOW') {
-                        impactIcon = '🟡';
-                        impactBadgeClass = 'impact-badge-low';
-                    }
+            let peakImpact = "MEDIUM";
+            if (group.events.some(e => (e.impact || e.importance || '').toUpperCase() === "HIGH")) {
+                peakImpact = "HIGH";
+            }
+            let badgeStyle = "bg-amber-500/10 text-amber-400 border-amber-500/20";
+            if (peakImpact === "HIGH") {
+                badgeStyle = "bg-red-500/10 text-red-400 border-red-500/20";
+            }
 
-                    const eventTitles = group.events.map(title => `• ${title}`).join('<br>');
-                    const impactContent = `<span class="impact-badge ${impactBadgeClass}">${impactIcon} ${group.impact}</span>`;
+            const toggleIcon = isCollapsed ? 'fa-square-plus text-amber-400' : 'fa-square-minus text-slate-500 hover:text-slate-300';
+            const countryHeader = `
+                <div class="flex items-center justify-between mb-1 flex-wrap gap-1">
+                    <div class="flex items-center gap-1.5">
+                        <div class="bg-slate-900 border border-slate-800 px-2 py-0.5 rounded text-[10px] font-bold text-slate-300 tracking-wider">${group.country}</div>
+                        <span class="text-[9px] px-1.5 py-0.5 rounded font-bold tracking-wider border ${badgeStyle}">${peakImpact}</span>
+                        <span class="text-[10px] text-slate-500 font-mono">(${group.events.length} ข่าว)</span>
+                    </div>
+                    <button onclick="toggleTimeGroup('${group.key}')" class="text-xs focus:outline-none px-1 py-0.5 rounded hover:bg-slate-800/40" title="ยุบ/ขยาย"><i class="fa-solid ${toggleIcon} transition-all duration-200"></i></button>
+                </div>
+            `;
 
-                    inner += `
-                        <tr>
-                            <td data-label="เวลา" class="time-cell">${group.time}</td>
-                            <td data-label="ประเทศ" class="country-cell">${group.country}</td>
-                            <td data-label="ระดับความรุนแรง" class="impact-cell">${impactContent}</td>
-                            <td data-label="ข่าวสำคัญ" class="event-title">${eventTitles}</td>
-                        </tr>
+            let eventsBoxContent = "";
+            if (!isCollapsed) {
+                group.events.forEach(event => {
+                    const title = event.title || event.event || event.name || 'Untitled';
+                    const isCore = title.toLowerCase().includes("core");
+                    eventsBoxContent += `
+                        <div class="grid grid-cols-12 items-center gap-1.5 py-1.5 border-b border-slate-800/30 last:border-0 hover:bg-slate-800/20 rounded px-1.5 -mx-1.5 transition-all">
+                            <div class="col-span-12 flex items-center gap-2">
+                                <span class="text-blue-500/70 text-[6px]"><i class="fa-solid fa-circle"></i></span>
+                                <div class="leading-tight">
+                                    <span class="text-xs font-semibold text-slate-200">${title}</span>
+                                    ${isCore ? '<span class="ml-1 text-[8px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1 py-0.5 rounded font-bold uppercase">Core</span>' : ''}
+                                </div>
+                            </div>
+                        </div>
                     `;
                 });
-
-                inner += '</tbody></table>';
+            } else {
+                const titleSnippets = group.events.map(e => e.title || e.event || e.name).join(', ');
+                eventsBoxContent = `<div onclick="toggleTimeGroup('${group.key}')" class="py-1 text-[10px] text-slate-500 italic cursor-pointer hover:text-slate-300 truncate"><i class="fa-solid fa-eye-slash mr-1"></i> ยุบอยู่: ${titleSnippets}</div>`;
             }
-            const hiddenAttr = (d === activeDate) ? '' : ' hidden';
-            contentHtml += `<section id="day-${d}" class="day-section${hiddenAttr}"><h2 class="text-lg font-semibold mb-4 text-indigo-400">📅 ${dateLabel}</h2>${inner}</section>`;
+
+            const groupDetails = `
+                <div class="flex-grow pb-2">
+                    ${countryHeader}
+                    <div class="bg-gradient-to-b from-[#111827] to-[#0a0f1d] border border-slate-800/80 rounded-xl px-3 py-1.5 shadow-md">
+                        <div class="divide-y divide-slate-800/30">${eventsBoxContent}</div>
+                    </div>
+                </div>
+            `;
+            contentHtml += `<div class="relative flex gap-3 md:gap-4 group transition-all duration-200 mb-1.5">${timelineMarkup}${groupDetails}</div>`;
         });
-        contentHtml += '</div>';
 
-        eventsListEl.innerHTML = tabsHtml + contentHtml;
+        eventsListContentEl.innerHTML = contentHtml;
 
-        // Wire up tab click behavior and persist selection
-        document.querySelectorAll('.day-tab').forEach(btn => {
-            btn.addEventListener('click', (ev) => {
-                const btnEl = ev.currentTarget;
-                const date = btnEl.dataset.date;
-
-                // Save selection in-memory for auto refreshes
-                selectedEventDate = date;
-
-                document.querySelectorAll('.day-tab').forEach(b => {
-                    b.classList.remove('bg-indigo-600', 'text-white');
-                    b.classList.add('bg-gray-800', 'text-gray-300');
-                });
-
-                // Activate clicked
-                btnEl.classList.add('bg-indigo-600', 'text-white');
-                btnEl.classList.remove('bg-gray-800', 'text-gray-300');
-
-                // Show/hide sections
-                document.querySelectorAll('.day-section').forEach(sec => {
-                    if (sec.id === `day-${date}`) {
-                        sec.classList.remove('hidden');
-                    } else {
-                        sec.classList.add('hidden');
-                    }
-                });
-            });
-        });
+        // Event listeners are now handled by delegation, so this block is no longer needed.
     }
 
     function updateDashboard(data) {
@@ -715,10 +797,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Initial Load ---
-    fetchData();
+    initialLoad();
 
     // Set interval to refresh data
     setInterval(fetchData, REFRESH_INTERVAL);
+    setInterval(fetchEquityHistory, REFRESH_INTERVAL * 4); // Refresh chart every minute
     // Refresh economic events every 5 minutes
     setInterval(fetchEconomicEvents, 300000);
 });

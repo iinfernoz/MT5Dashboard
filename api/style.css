@@ -693,3 +693,28 @@ body {
         font-size: 0.85rem;
     }
 }
+
+/* --- Economic Events Timeline Styles --- */
+.timeline-connector {
+    position: absolute;
+    left: 21px; /* Aligns with the center of the 44px time button */
+    top: 24px;
+    bottom: -20px;
+    width: 2px;
+    background: linear-gradient(to bottom, #1e293b, #334155 50%, #1e293b);
+    z-index: 1;
+}
+
+.timeline-connector-last {
+    bottom: auto;
+    height: 0px; /* The last item doesn't have a line going down */
+}
+
+/* Custom scrollbar for date tabs */
+.scrollbar-none::-webkit-scrollbar {
+    display: none;
+}
+.scrollbar-none {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}

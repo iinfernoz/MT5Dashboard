@@ -2,7 +2,7 @@ import os
 import pymysql
 import json
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
@@ -135,24 +135,34 @@ def _filter_today_high_usd(raw_list):
 def _group_week_events_by_date(raw_list):
     """Return a dict mapping ISO date -> list of all events for that date."""
     def _get_event_date_iso(ev):
-        for k in ('date', 'date_str', 'local_date', 'datetime', 'time'):
+        """
+        Parses an event's date/time string and returns the ISO date (YYYY-MM-DD)
+        corresponding to the event's occurrence in Thailand's timezone (UTC+7).
+        """
+        thailand_tz = timezone(timedelta(hours=7))
+
+        for k in ('date', 'datetime', 'time', 'local_date', 'date_str'):
             v = ev.get(k)
-            if isinstance(v, str):
-                # If it starts with YYYY-MM-DD, return that
-                if len(v) >= 10 and v[4] == '-' and v[7] == '-':
-                    return v[:10]
-                # Try ISO parse
-                try:
-                    d = datetime.fromisoformat(v)
-                    return d.date().isoformat()
-                except Exception:
-                    pass
-        # timestamp fallback
+            if not isinstance(v, str):
+                continue
+
+            # Prioritize parsing full ISO 8601 timestamps, as they are most accurate.
+            try:
+                dt_aware = datetime.fromisoformat(v.replace('Z', '+00:00'))
+                dt_thailand = dt_aware.astimezone(thailand_tz)
+                return dt_thailand.date().isoformat()
+            except (ValueError, TypeError):
+                # If parsing fails, it's not a standard ISO string, so we continue.
+                pass
+
+        # Fallback for integer timestamp (assumed to be UTC)
         if 'timestamp' in ev:
             try:
                 ts = int(ev.get('timestamp'))
-                return datetime.utcfromtimestamp(ts).date().isoformat()
-            except Exception:
+                dt_utc = datetime.fromtimestamp(ts, tz=timezone.utc)
+                dt_thailand = dt_utc.astimezone(thailand_tz)
+                return dt_thailand.date().isoformat()
+            except (ValueError, TypeError):
                 pass
         return None
 

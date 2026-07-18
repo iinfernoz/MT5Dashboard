@@ -62,21 +62,28 @@
                 </div>
             </section>
 
-            <section class="glass-card news-card" id="economic-events-container">
-                <div class="card-header">
-                    <div>
-                        <h2>ข่าวเศรษฐกิจสำคัญ (High Impact)</h2>
-                        <p class="subtitle">ติดตามข่าวสำคัญประจำสัปดาห์ แยกตามวัน (ดีฟอลต์: วันนี้)</p>
-                    </div>
-                    <div id="economic-events-meta" class="text-muted"></div>
-                </div>
-
-                <div class="card-body" id="events-list">
-                    <p class="text-muted">Loading economic events…</p>
-                </div>
-            </section>
-
             <section id="accounts-table-container" class="glass-card table-card"></section>
+
+            <!-- START: New Economic Events Section (Moved and Redesigned) -->
+            <div id="economic-events-section" class="bg-[#0b1120] border border-slate-900 rounded-xl shadow-2xl p-3 md:p-5 transition-all duration-500 w-full">
+                <div class="flex flex-col gap-3 mb-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                            <div class="flex items-center justify-between mb-0.5">
+                                <h2 class="text-base font-bold text-slate-100 flex items-center gap-2">
+                                    <i class="fa-solid fa-calendar-week text-blue-500 text-sm"></i>
+                                    ข่าวเศรษฐกิจสำคัญประจำสัปดาห์
+                                </h2>
+                            </div>
+                            <p class="text-[11px] text-slate-400">แสดงข่าวสารผลกระทบระดับ Medium และ High ที่สำคัญในสัปดาห์นี้</p>
+                        </div>
+                    </div>
+                    <div id="events-list-tabs" class="relative"></div>
+                </div>
+                <div id="events-list-header" class="flex items-center justify-between border-b border-slate-800 pb-2 mb-3"></div>
+                <div id="events-list-content" class="space-y-2 md:space-y-3"></div>
+            </div>
+            <!-- END: New Economic Events Section -->
 
             <section class="glass-card chart-card">
                 <div class="card-header">
