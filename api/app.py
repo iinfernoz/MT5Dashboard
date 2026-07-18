@@ -540,6 +540,50 @@ def get_equity_history():
             conn.close()
 
 
+@app.route('/api/admin/reset_daily_profit', methods=['POST'])
+def reset_daily_profit():
+    """
+    Admin endpoint to reset the daily profit for a specific account on a specific date.
+    This is useful for correcting erroneous profit data.
+    Expects JSON payload: {"account_number": 12345, "date": "YYYY-MM-DD"}
+    """
+    if not request.is_json:
+        return jsonify({"status": "error", "message": "Request must be JSON"}), 400
+
+    data = request.get_json()
+    account_number = data.get('account_number')
+    date_str = data.get('date')
+
+    if not account_number or not date_str:
+        return jsonify({"status": "error", "message": "Missing 'account_number' or 'date'"}), 400
+
+    try:
+        # Validate date format
+        reset_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return jsonify({"status": "error", "message": "Invalid date format. Use YYYY-MM-DD."}), 400
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"status": "error", "message": "Could not connect to the database"}), 503
+
+    try:
+        sql = "UPDATE account_data SET profit = 0 WHERE account_number = %s AND DATE(received_at) = %s"
+        with conn.cursor() as cursor:
+            rows_affected = cursor.execute(sql, (account_number, reset_date))
+        conn.commit()
+        return jsonify({
+            "status": "success",
+            "message": f"Reset profit to 0 for account {account_number} on {reset_date}. {rows_affected} records updated."
+        }), 200
+    except pymysql.MySQLError as e:
+        print(f"Database Error during profit reset: {e}")
+        return jsonify({"status": "error", "message": "Database operation failed"}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
 @app.route('/api/monthly_profit_details', methods=['GET'])
 def get_monthly_profit_details():
     """
