@@ -206,7 +206,7 @@ void SendUpdateToServer()
    }
    else if (res == 201) // 201 Created คือรหัสที่ API ของเราส่งกลับมาเมื่อบันทึกข้อมูลสำเร็จ
    {
-      Print("EA data sent successfully to dashboard API. Account: ", InpAccountName);
+      Print("EA data sent successfully to dashboard API. Account: ", InpAccountName, ". Daily Profit sent: ", DoubleToString(dailyProfit, 2));
    }
    else
    {
