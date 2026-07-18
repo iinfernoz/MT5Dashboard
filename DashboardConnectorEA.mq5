@@ -55,14 +55,14 @@ void OnTimer()
 //+------------------------------------------------------------------+
 double GetRealizedDailyProfit()
 {
-   //--- กำหนดช่วงเวลาของวันนี้ (ตั้งแต่เที่ยงคืนถึงเวลาปัจจุบัน)
+   //--- กำหนดช่วงเวลาของวันนี้โดยใช้เวลาท้องถิ่น (Local Time) ของเครื่องผู้ใช้
    MqlDateTime st;
-   TimeCurrent(st);
+   TimeLocal(st); // ใช้เวลาท้องถิ่นเพื่อกำหนด "วันนี้"
    st.hour = 0;
    st.min = 0;
    st.sec = 0;
-   datetime from_date = StructToTime(st);
-   datetime to_date = TimeCurrent();
+   datetime from_date = StructToTime(st); // เวลาเที่ยงคืนตามเวลาท้องถิ่น
+   datetime to_date = TimeCurrent();     // เวลาปัจจุบันของเซิร์ฟเวอร์ (เพื่อให้ได้ deal ล่าสุด)
 
    //--- เลือกประวัติการเทรดในช่วงเวลาที่กำหนด
    if(!HistorySelect(from_date, to_date))
@@ -80,9 +80,16 @@ double GetRealizedDailyProfit()
    {
       if((deal_ticket = HistoryDealGetTicket(i)) > 0)
       {
+         //--- [IMPROVEMENT] ถ้ามีการระบุ Magic Number ให้กรองเฉพาะ deal ของ Magic Number นั้น
+         //    ถ้า InpMagicNumber เป็น 0 จะนับรวมทุก deal
+         if(InpMagicNumber != 0)
+         {
+            if(HistoryDealGetInteger(deal_ticket, DEAL_MAGIC) != InpMagicNumber)
+               continue; // ข้าม deal ที่มี magic number ไม่ตรงกัน
+         }
+
          long deal_type = HistoryDealGetInteger(deal_ticket, DEAL_TYPE);
 
-         //--- **จุดแก้ไข:** รวมเฉพาะกำไร/ขาดทุนจาก deal ที่เป็นการเทรด (Buy/Sell) เท่านั้น
          if(deal_type == DEAL_TYPE_BUY || deal_type == DEAL_TYPE_SELL)
          {
             realized_profit += HistoryDealGetDouble(deal_ticket, DEAL_PROFIT);
